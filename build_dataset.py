@@ -13,6 +13,8 @@ Steps
   - balance    : caps images per class so F-16 / C-130 don't swamp the rare classes
   - split      : fresh 70 / 20 / 10 train / val / test split, stratified by each image's rarest class
   - write      : YOLO folders, data.yaml, class_affiliation.json, and stats CSVs for the paper
+  - leakage    : val vs train and test vs train+val, invariant to hflip / vflip / rot180
+                 -> val_clean.txt, test_clean.txt, data_clean.yaml; counts in build_report.json
 
 Usage
   pip install roboflow imagehash pillow pyyaml
@@ -258,11 +260,9 @@ def _popcount(x: int) -> int:
     return bin(x).count("1")
 
 
-def _image_hashes(path: Path, boxes):
-    """Return (md5_hex, full_phash_int, crop_phash_int). Memory-light:
-    JPEGs are decoded at reduced scale via draft() (pHash works on 32x32 anyway)."""
-    data = path.read_bytes()
-    digest = hashlib.md5(data).hexdigest()
+def _decode_for_hash(data: bytes) -> Image.Image:
+    """Memory-light decode used for every pHash: JPEGs are decoded at reduced scale via draft()
+    (pHash works on 32x32 anyway)."""
     with Image.open(io.BytesIO(data)) as im:
         try:
             im.draft("RGB", (512, 512))
@@ -270,9 +270,20 @@ def _image_hashes(path: Path, boxes):
             pass
         if im.width * im.height > 25_000_000:  # huge PNG/TIFF: shrink before converting
             im.thumbnail((2048, 2048))
-        im = im.convert("RGB")
-        full = int(str(imagehash.phash(im)), 16)
-        crop = int(str(imagehash.phash(_largest_box_crop(im, boxes))), 16)
+        return im.convert("RGB")
+
+
+def _phash_int(im: Image.Image) -> int:
+    return int(str(imagehash.phash(im)), 16)
+
+
+def _image_hashes(path: Path, boxes):
+    """Return (md5_hex, full_phash_int, crop_phash_int)."""
+    data = path.read_bytes()
+    digest = hashlib.md5(data).hexdigest()
+    im = _decode_for_hash(data)
+    full = _phash_int(im)
+    crop = _phash_int(_largest_box_crop(im, boxes))
     del data
     return digest, full, crop
 
@@ -535,6 +546,153 @@ def write_dataset(splits, out_dir: Path, stats):
 
 
 # --------------------------------------------------------------------------------------
+# Final step: flip/rotation-invariant leakage check on the written split
+# --------------------------------------------------------------------------------------
+# dedupe() compares images as they are; Roboflow exports also contain flipped / rotated copies of the
+# same photo, which survive it and can land in different splits. Here every val image (vs train) and
+# every test image (vs train + val) is hashed as-is and as hflip / vflip / rot180; it is flagged when, for
+# some variant, BOTH the whole-image and the largest-box-crop pHash are within `max_dist` of one image.
+# Flagged images are only left out of <split>_clean.txt; no file is moved or deleted.
+LEAK_VARIANTS = {
+    "none": None,
+    "hflip": Image.Transpose.FLIP_LEFT_RIGHT,
+    "vflip": Image.Transpose.FLIP_TOP_BOTTOM,
+    "rot180": Image.Transpose.ROTATE_180,
+}
+
+
+def _variant_hashes(path: Path, boxes):
+    """{variant: (full, crop)}; the crop is cut from the original and then transformed (= the crop of
+    the transformed image), decoded exactly as in _image_hashes."""
+    im = _decode_for_hash(path.read_bytes())
+    crop = _largest_box_crop(im, boxes)
+    return {v: (_phash_int(im if t is None else im.transpose(t)),
+                _phash_int(crop if t is None else crop.transpose(t))) for v, t in LEAK_VARIANTS.items()}
+
+
+def _hamming(arr, h: int):
+    """Hamming distance between a uint64 array and one 64-bit hash."""
+    import numpy as np
+    x = arr ^ np.uint64(h)
+    if hasattr(np, "bitwise_count"):  # numpy >= 2
+        return np.bitwise_count(x).astype(np.int16)
+    return np.unpackbits(x.view(np.uint8).reshape(-1, 8), axis=1).sum(1).astype(np.int16)
+
+
+def _split_boxes(out_dir: Path, split: str, img: Path):
+    lbl = out_dir / "labels" / split / (img.stem + ".txt")
+    boxes = []
+    if lbl.exists():
+        for line in lbl.read_text().splitlines():
+            p = line.split()
+            if len(p) >= 5:
+                boxes.append((int(p[0]), " ".join(p[1:5])))
+    return boxes
+
+
+def leakage_check(out_dir: Path, max_dist: int = 6, cache_path: Path = None, log=print):
+    """Returns one dict per val and test image: split, file, source, class_ids, flagged, and for a flagged
+    image the best match (variant, match_file, match_split, d_full, d_crop) plus n_matched / variants_matched.
+    Train hashes come from the hash cache when the raw file is still there (cvs files are copy2 copies)."""
+    import numpy as np
+    out_dir = Path(out_dir)
+    with open(out_dir / "manifest.csv", encoding="utf-8") as f:
+        manifest = {r["file"]: r for r in csv.DictReader(f)}
+    cache = HashCache(Path(cache_path)) if cache_path and Path(cache_path).exists() else None
+
+    def cached(img: Path):
+        if cache is None or img.name not in manifest:
+            return None
+        raw = Path(manifest[img.name]["original_path"])
+        if not raw.exists() or raw.stat().st_size != img.stat().st_size:
+            return None
+        v = cache.get(raw)
+        return (v[1], v[2]) if v else None
+
+    def load(split, variants):
+        recs, fresh = [], 0
+        for img in sorted((out_dir / "images" / split).iterdir()):
+            boxes = _split_boxes(out_dir, split, img)
+            rec = {"split": split, "file": img.name, "source": manifest.get(img.name, {}).get("source", ""),
+                   "class_ids": sorted({b[0] for b in boxes}), "vh": None}
+            if boxes:
+                ident = None if variants else cached(img)
+                if ident is None:
+                    rec["vh"] = _variant_hashes(img, boxes)
+                    fresh += 1
+                else:
+                    rec["vh"] = {"none": ident}
+            recs.append(rec)
+        log(f"[leakage] {split}: {len(recs)} images ({fresh} hashed fresh, {len(recs) - fresh} from cache)")
+        return recs
+
+    train, val, test = load("train", False), load("val", True), load("test", True)
+    if cache is not None:
+        cache.close()
+
+    def check(queries, refs):
+        refs = [r for r in refs if r["vh"]]
+        R_full = np.array([r["vh"]["none"][0] for r in refs], dtype=np.uint64)
+        R_crop = np.array([r["vh"]["none"][1] for r in refs], dtype=np.uint64)
+        for q in queries:
+            q.update(flagged=0, variant="", match_file="", match_split="", d_full="", d_crop="",
+                     n_matched=0, variants_matched="")
+            if not q["vh"]:
+                continue
+            hits = []
+            for v, (full, crop) in q["vh"].items():
+                df, dc = _hamming(R_full, full), _hamming(R_crop, crop)
+                hits += [(int(df[i]) + int(dc[i]), list(LEAK_VARIANTS).index(v), v, i, int(df[i]), int(dc[i]))
+                         for i in np.flatnonzero((df <= max_dist) & (dc <= max_dist))]
+            if hits:
+                _, _, v, i, d_full, d_crop = min(hits)  # closest match; ties -> untransformed first
+                q.update(flagged=1, variant=v, match_file=refs[i]["file"], match_split=refs[i]["split"],
+                         d_full=d_full, d_crop=d_crop, n_matched=len({h[3] for h in hits}),
+                         variants_matched=";".join(sorted({h[2] for h in hits})))
+
+    check(val, train)
+    check(test, train + val)  # all val images, flagged or not: conservative
+    rows = val + test
+    for r in rows:
+        r.pop("vh")
+    return rows
+
+
+def write_clean_splits(out_dir: Path, rows, stats=None, max_dist: int = 6):
+    """Write <out>/val_clean.txt, <out>/test_clean.txt (absolute image paths, flagged images left out) and
+    <out>/data_clean.yaml (train as in data.yaml; val/test -> the lists). Adds the counts to `stats`."""
+    out_dir = Path(out_dir).resolve()
+    d = yaml.safe_load((out_dir / "data.yaml").read_text())
+    counts = {}
+    for split in ("val", "test"):
+        sr = [r for r in rows if r["split"] == split]
+        keep = [(out_dir / "images" / split / r["file"]).as_posix() for r in sr if not r["flagged"]]
+        (out_dir / f"{split}_clean.txt").write_text("\n".join(keep) + "\n", encoding="utf-8")
+        counts[split] = (len(sr), len(sr) - len(keep), len(keep))
+    clean = {"path": out_dir.as_posix(), "train": d["train"], "val": "val_clean.txt", "test": "test_clean.txt",
+             "nc": d["nc"], "names": d["names"]}
+    with open(out_dir / "data_clean.yaml", "w") as f:
+        yaml.safe_dump(clean, f, sort_keys=False)
+    if stats is not None:
+        stats["leakage_max_dist"] = max_dist
+        for split, (n, fl, kept) in counts.items():
+            stats[f"leakage_{split}_images"] = n
+            stats[f"leakage_{split}_flagged"] = fl
+            stats[f"leakage_{split}_clean"] = kept
+        for v in LEAK_VARIANTS:
+            stats[f"leakage_flagged_variant_{v}"] = sum(1 for r in rows if r["flagged"] and r["variant"] == v)
+    return counts
+
+
+def update_build_report(out_dir: Path, stats):
+    """Merge `stats` into <out>/build_report.json (keys kept sorted)."""
+    p = Path(out_dir) / "build_report.json"
+    rep = json.loads(p.read_text()) if p.exists() else {}
+    rep.update(dict(stats))
+    p.write_text(json.dumps(dict(sorted(rep.items())), indent=2))
+
+
+# --------------------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--download", action="store_true", help="download the Roboflow exports first")
@@ -544,6 +702,8 @@ def main():
     ap.add_argument("--other-cap", type=int, default=3000, help="max images holding only other_aircraft")
     ap.add_argument("--phash-dist", type=int, default=4, help="near-duplicate Hamming threshold")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--leak-dist", type=int, default=6,
+                    help="flip/rotation leakage check: Hamming threshold on whole AND crop pHash")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -572,6 +732,15 @@ def main():
 
     print(f"[write] {args.out_dir}/  train {len(splits['train'])}  val {len(splits['val'])}  "
           f"test {len(splits['test'])}")
+
+    leak_stats = Counter()
+    rows = leakage_check(args.out_dir, args.leak_dist, args.raw_dir / "hash_cache.tsv")
+    counts = write_clean_splits(args.out_dir, rows, leak_stats, args.leak_dist)
+    update_build_report(args.out_dir, leak_stats)
+    for split, (n, fl, kept) in counts.items():
+        print(f"[leakage] {split}: {fl}/{n} flagged as flipped/rotated copies -> {kept} in {split}_clean.txt")
+    print(f"[leakage] wrote {args.out_dir}/val_clean.txt, test_clean.txt, data_clean.yaml "
+          f"(python audit_leakage.py for the full report)")
     thin = [c for c in TARGET_CLASSES if c != OTHER and sum(per_class[c].values()) < 300]
     if thin:
         print("[warn] classes under 300 images (collect more before training):")

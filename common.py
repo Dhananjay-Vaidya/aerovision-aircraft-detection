@@ -91,10 +91,61 @@ def _link(src: Path, dst: Path):
     raise OSError(f"could not link or copy {src} -> {dst}")
 
 
+SPLIT_SETS = ("clean", "full")
+
+
+def clean_names(dataset_dir: str | Path, split: str) -> set[str]:
+    """File names listed in <dataset>/<split>_clean.txt (written by build_dataset.py / audit_leakage.py)."""
+    lst = Path(dataset_dir) / f"{split}_clean.txt"
+    if not lst.exists():
+        raise SystemExit(f"{lst} not found: run `python audit_leakage.py` first (or use --split-set full)")
+    return {Path(line.strip()).name for line in lst.read_text(encoding="utf-8").splitlines() if line.strip()}
+
+
 def merged_dataset(data_yaml: str | Path, out_dir: str | Path = MERGED_DIR, results_dir: str | Path | None = None,
-                   min_train_images: int = MIN_TRAIN_IMAGES) -> Path:
+                   min_train_images: int = MIN_TRAIN_IMAGES, split_set: str = "full") -> Path:
     """Build (or refresh) the merged view of the dataset: images linked, labels remapped with class_merge_map.
-    Writes results/merged_classes.txt. Returns the merged data.yaml. `cvs_dataset/` is never written to."""
+    Writes results/merged_classes.txt. Returns the merged data.yaml. `cvs_dataset/` is never written to.
+
+    split_set="clean": also writes <out>/val_clean.txt, <out>/test_clean.txt (merged-view paths of the images in
+    <dataset>/{val,test}_clean.txt, i.e. without train/val near-copies) and returns <out>/data_clean.yaml, whose
+    val/test entries are those lists. Train is the same in both."""
+    if split_set not in SPLIT_SETS:
+        raise ValueError(f"split_set must be one of {SPLIT_SETS}")
+    full_yaml = _merged_full(data_yaml, out_dir, results_dir, min_train_images)
+    if split_set == "full":
+        return full_yaml
+    out = Path(out_dir)
+    d = yaml.safe_load(full_yaml.read_text(encoding="utf-8"))
+    for split in ("val", "test"):
+        keep = clean_names(Path(data_yaml).resolve().parent, split)
+        imgs = [p for p in list_images(out / d[split]) if p.name in keep]
+        missing = keep - {p.name for p in imgs}
+        if missing:
+            raise SystemExit(f"{len(missing)} {split}_clean images not in {out / d[split]}, e.g. {sorted(missing)[:3]}")
+        lst = out / f"{split}_clean.txt"
+        lst.write_text("\n".join(p.resolve().as_posix() for p in imgs) + "\n", encoding="utf-8")
+        d[split] = lst.name
+    out_yaml = out / "data_clean.yaml"
+    out_yaml.write_text(yaml.safe_dump(d, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return out_yaml
+
+
+def split_images(data_yaml: str | Path, split: str) -> list[Path]:
+    """Images of a split from a data yaml whose entry is a folder or a .txt list."""
+    data_yaml = Path(data_yaml)
+    entry = data_yaml.parent / yaml.safe_load(data_yaml.read_text(encoding="utf-8"))[split]
+    if entry.suffix == ".txt":
+        return [Path(l.strip()) for l in entry.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return list_images(entry)
+
+
+def merged_labels_dir(data_yaml: str | Path, split: str) -> Path:
+    """Label folder of a split in the merged view (same for full and clean)."""
+    return Path(data_yaml).parent / "labels" / split
+
+
+def _merged_full(data_yaml, out_dir, results_dir, min_train_images) -> Path:
     data_yaml = Path(data_yaml).resolve()
     d = yaml.safe_load(data_yaml.read_text(encoding="utf-8"))
     base, out = data_yaml.parent, Path(out_dir)

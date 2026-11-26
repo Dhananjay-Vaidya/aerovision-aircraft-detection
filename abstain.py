@@ -14,6 +14,9 @@ box's true affiliation differs (a true `ambiguous`/`unknown` aircraft can never 
   coverage = accepted / all detections        risk = errors / accepted
   affiliation accuracy = 1 - risk  (and, separately, accuracy on accepted detections that match a GT box)
 
+--split-set clean (default): val and test use cvs_dataset/{val,test}_clean.txt (flipped/rotated near-copies of
+train images removed; see audit_leakage.py). --split-set full: every image, outputs named <name>_full_*.
+
 Writes results/<name>_abstain.json and results/<name>_riskcov.csv (risk-coverage curves, val + test).
 """
 from __future__ import annotations
@@ -24,9 +27,8 @@ import json
 from pathlib import Path
 
 import numpy as np
-import yaml
 
-from common import ROOT, list_images, load_affiliation, load_names, merged_dataset
+from common import ROOT, SPLIT_SETS, load_affiliation, load_names, merged_dataset, merged_labels_dir, split_images
 
 DEFINITE = ("allied", "adversary")
 
@@ -122,6 +124,8 @@ def main(argv=None):
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--results", default=str(ROOT / "results"))
+    ap.add_argument("--split-set", choices=SPLIT_SETS, default="clean",
+                    help="clean: val/test without train near-copies (default); full: all images")
     args = ap.parse_args(argv)
 
     from ultralytics import YOLO
@@ -130,21 +134,22 @@ def main(argv=None):
     if not weights.exists():
         raise SystemExit(f"weights not found: {weights}")
     name = args.name or (weights.parent.parent.name if weights.parent.name == "weights" else weights.stem)
+    if args.split_set == "full":
+        name += "_full"
     # merged labels: classes with < 50 training images -> other_aircraft (same rule as train.py / evaluate.py)
-    data_yaml = merged_dataset(args.data, results_dir=args.results)
-    d = yaml.safe_load(data_yaml.read_text(encoding="utf-8"))
+    data_yaml = merged_dataset(args.data, results_dir=args.results, split_set=args.split_set)
     names = load_names(data_yaml)
     aff = load_affiliation(args.affiliation or Path(args.data).resolve().parent / "class_affiliation.json")
     model = YOLO(str(weights))
     if len(model.names) != len(names):
         raise SystemExit(f"model has {len(model.names)} classes but data.yaml has {len(names)}")
 
-    out, curves = {"target_risk": args.target_risk, "det_conf": args.conf, "weights": str(weights)}, {}
+    out, curves = {"target_risk": args.target_risk, "det_conf": args.conf, "weights": str(weights),
+                   "split_set": args.split_set}, {}
     for split in ("val", "test"):
-        img_dir = data_yaml.parent / d[split]
-        imgs = list_images(img_dir)[: args.limit] if args.limit else list_images(img_dir)
-        P, C, G = collect(model, imgs, data_yaml.parent / str(d[split]).replace("images", "labels"),
-                          args.conf, args.imgsz)
+        imgs = split_images(data_yaml, split)
+        imgs = imgs[: args.limit] if args.limit else imgs
+        P, C, G = collect(model, imgs, merged_labels_dir(data_yaml, split), args.conf, args.imgsz)
         score, correct, matched = score_and_correct(P, C, G, names, aff)
         th, cov, rk = risk_coverage(score, correct)
         curves[split] = (th, cov, rk)

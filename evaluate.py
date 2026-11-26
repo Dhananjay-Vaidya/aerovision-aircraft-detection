@@ -3,6 +3,10 @@
   python evaluate.py --weights runs/yolo26s_none/weights/best.pt
   python evaluate.py --weights runs/yolo26s_degrade/weights/best.pt --name yolo26s_degrade
 
+--split-set clean (default) uses only the test images in cvs_dataset/test_clean.txt (no flipped/rotated near-copies
+of train/val images; see audit_leakage.py), for the clean score AND for Aircraft-C (restricted by file name, not
+regenerated). --split-set full uses every test image and writes results/<name>_full*.csv instead.
+
 Labels (clean and Aircraft-C) are the merged ones (classes with < 50 training images -> other_aircraft;
 common.class_merge_map), the same as train.py and abstain.py use.
 
@@ -23,8 +27,8 @@ from pathlib import Path
 
 import yaml
 
-from common import CORRUPTION_GROUP, ROOT, default_workers, list_images, load_affiliation, load_names, \
-    merged_dataset
+from common import CORRUPTION_GROUP, ROOT, SPLIT_SETS, default_workers, list_images, load_affiliation, load_names, \
+    merged_dataset, split_images
 
 GROUPS = ("seen", "held_out", "all")
 METRICS = ("map50", "map50_95", "precision", "recall")
@@ -62,6 +66,8 @@ def main(argv=None):
     ap.add_argument("--conf", type=float, default=0.001)
     ap.add_argument("--workers", type=int, default=default_workers())
     ap.add_argument("--device", default=None)
+    ap.add_argument("--split-set", choices=SPLIT_SETS, default="clean",
+                    help="clean: test images without train/val near-copies (default); full: all test images")
     args = ap.parse_args(argv)
 
     from ultralytics import YOLO
@@ -70,8 +76,9 @@ def main(argv=None):
     if not weights.exists():
         raise SystemExit(f"weights not found: {weights}")
     name = args.name or (weights.parent.parent.name if weights.parent.name == "weights" else weights.stem)
-    data_yaml = merged_dataset(args.data, results_dir=args.results)
-    d = yaml.safe_load(data_yaml.read_text(encoding="utf-8"))
+    if args.split_set == "full":
+        name += "_full"
+    data_yaml = merged_dataset(args.data, results_dir=args.results, split_set=args.split_set)
     names = load_names(data_yaml)
     aff = load_affiliation(Path(args.data).resolve().parent / "class_affiliation.json")
     croot = Path(args.corrupt_root)
@@ -84,7 +91,8 @@ def main(argv=None):
     if not conditions:
         raise SystemExit(f"No Aircraft-C folders under {croot}. Run corrupt.py first.")
     keep = {p.stem for p in list_images(conditions[0][2])}  # clean = the same images Aircraft-C contains
-    clean = [p for p in list_images(data_yaml.parent / d["test"]) if p.stem in keep]
+    clean = [p for p in split_images(data_yaml, "test") if p.stem in keep]
+    print(f"[evaluate.py] split set {args.split_set}: {len(clean)} test images (Aircraft-C restricted to these)")
     if args.limit:
         clean = clean[: args.limit]
     keep = {p.stem for p in clean}

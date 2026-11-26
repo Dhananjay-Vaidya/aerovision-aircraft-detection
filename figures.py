@@ -2,6 +2,10 @@
 
   python figures.py                                   # every model found in results/
   python figures.py --models yolo26s_none yolo26s_degrade
+  python figures.py --split-set full                  # results from --split-set full runs (<name>_full*.csv)
+
+--split-set clean (default) plots results computed on the leakage-free val/test lists (evaluate.py / abstain.py
+default) into results/figures/; full plots the *_full results into results/figures_full/.
 
   robustness_vs_severity  mAP vs severity (0 = clean), one panel per corruption + seen / held-out / all means
   risk_coverage           selective risk vs coverage on test, from abstain.py
@@ -20,7 +24,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from common import CORRUPTION_GROUP, HELD_OUT_CORRUPTIONS, ROOT, SEEN_CORRUPTIONS  # noqa: E402
+from common import CORRUPTION_GROUP, HELD_OUT_CORRUPTIONS, ROOT, SEEN_CORRUPTIONS, SPLIT_SETS  # noqa: E402
 
 AFF_COLOR = {"allied": "#1a7f37", "adversary": "#cf222e", "ambiguous": "#bf8700", "unknown": "#57606a"}
 
@@ -33,13 +37,21 @@ def save(fig, out: Path, stem: str):
     print(f"[figures.py] {out / stem}.png/.pdf")
 
 
-def discover(res: Path) -> list[str]:
-    skip = ("_per_class", "_riskcov")
-    return sorted(p.stem for p in res.glob("*.csv") if not p.stem.endswith(skip))
+def discover(res: Path, suffix: str) -> list[str]:
+    """Model names with an evaluate.py result CSV (header starts with 'corruption') for this split set."""
+    out = []
+    for p in res.glob(f"*{suffix}.csv"):
+        stem = p.stem[: len(p.stem) - len(suffix)] if suffix else p.stem
+        if stem.endswith(("_per_class", "_riskcov")) or (not suffix and stem.endswith("_full")):
+            continue
+        with open(p, encoding="utf-8") as fh:
+            if fh.readline().startswith("corruption,"):
+                out.append(stem)
+    return sorted(out)
 
 
-def robustness(res: Path, models, out: Path, metric: str):
-    data = {m: pd.read_csv(res / f"{m}.csv") for m in models if (res / f"{m}.csv").exists()}
+def robustness(res: Path, models, out: Path, metric: str, sfx: str = ""):
+    data = {m: pd.read_csv(res / f"{m}{sfx}.csv") for m in models if (res / f"{m}{sfx}.csv").exists()}
     if not data:
         return
     for m, df in data.items():
@@ -83,17 +95,17 @@ def robustness(res: Path, models, out: Path, metric: str):
     save(fig, out, f"robustness_vs_severity_{metric}")
 
 
-def risk_coverage(res: Path, models, out: Path):
-    have = [m for m in models if (res / f"{m}_riskcov.csv").exists()]
+def risk_coverage(res: Path, models, out: Path, sfx: str = ""):
+    have = [m for m in models if (res / f"{m}{sfx}_riskcov.csv").exists()]
     if not have:
         return
     fig, ax = plt.subplots(figsize=(4.5, 3.4))
     target = None
     for m in have:
-        df = pd.read_csv(res / f"{m}_riskcov.csv")
+        df = pd.read_csv(res / f"{m}{sfx}_riskcov.csv")
         df = df[df["split"] == "test"]
         line, = ax.plot(df["coverage"], df["risk"], label=m)
-        j = res / f"{m}_abstain.json"
+        j = res / f"{m}{sfx}_abstain.json"
         if j.exists():
             info = json.loads(j.read_text())
             target = info["target_risk"]
@@ -111,8 +123,9 @@ def risk_coverage(res: Path, models, out: Path):
     save(fig, out, "risk_coverage")
 
 
-def per_class(res: Path, models, out: Path):
-    data = {m: pd.read_csv(res / f"{m}_per_class.csv") for m in models if (res / f"{m}_per_class.csv").exists()}
+def per_class(res: Path, models, out: Path, sfx: str = ""):
+    data = {m: pd.read_csv(res / f"{m}{sfx}_per_class.csv") for m in models
+            if (res / f"{m}{sfx}_per_class.csv").exists()}
     if not data:
         return
     classes = list(dict.fromkeys(c for df in data.values() for c in df["class"]))
@@ -143,17 +156,21 @@ def main(argv=None):
     ap.add_argument("--results", default=str(ROOT / "results"))
     ap.add_argument("--models", nargs="*", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--split-set", choices=SPLIT_SETS, default="clean")
     args = ap.parse_args(argv)
     res = Path(args.results)
-    out = Path(args.out) if args.out else res / "figures"
-    riskcov = sorted(p.stem[: -len("_riskcov")] for p in res.glob("*_riskcov.csv"))
-    models = args.models or sorted(set(discover(res)) | set(riskcov))
+    sfx = "" if args.split_set == "clean" else "_full"
+    out = Path(args.out) if args.out else res / ("figures" if args.split_set == "clean" else "figures_full")
+    riskcov = [p.stem[: -len(f"{sfx}_riskcov")] for p in res.glob(f"*{sfx}_riskcov.csv")]
+    riskcov = sorted(m for m in riskcov if sfx or not m.endswith("_full"))
+    models = args.models or sorted(set(discover(res, sfx)) | set(riskcov))
     if not models:
-        raise SystemExit(f"no results in {res}; run evaluate.py / abstain.py first")
-    robustness(res, models, out, "map50_95")
-    robustness(res, models, out, "map50")
-    risk_coverage(res, models, out)
-    per_class(res, models, out)
+        raise SystemExit(f"no {args.split_set} results in {res}; run evaluate.py / abstain.py first")
+    print(f"[figures.py] split set {args.split_set}: {models}")
+    robustness(res, models, out, "map50_95", sfx)
+    robustness(res, models, out, "map50", sfx)
+    risk_coverage(res, models, out, sfx)
+    per_class(res, models, out, sfx)
 
 
 if __name__ == "__main__":
