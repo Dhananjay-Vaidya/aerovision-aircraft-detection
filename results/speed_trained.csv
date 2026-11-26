@@ -1,0 +1,5 @@
+model,mode,ms_mean,ms_std,ms_p50,ms_p95,fps,ul_preprocess_ms,ul_inference_ms,ul_postprocess_ms,params_M,gflops,imgsz,batch,precision,warmup,runs,gpu,torch,ultralytics,python,weights
+yolov8s,forward,6.637,1.908,6.017,10.505,150.663,,,,11.140,28.508,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,C:\Users\Dhananjay Vaidya\Downloads\runs_yolov8s\yolov8s\weights\best.pt
+yolov8s,end_to_end,15.394,4.818,15.387,22.686,64.961,1.135,11.369,2.292,11.140,28.508,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,C:\Users\Dhananjay Vaidya\Downloads\runs_yolov8s\yolov8s\weights\best.pt
+yolo26s,forward,13.311,4.436,11.790,21.956,75.127,,,,9.479,20.839,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,C:\Users\Dhananjay Vaidya\Downloads\runs_yolo26s\yolo26s\weights\best.pt
+yolo26s,end_to_end,18.838,6.518,16.644,30.327,53.083,1.005,15.267,2.046,9.479,20.839,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,C:\Users\Dhananjay Vaidya\Downloads\runs_yolo26s\yolo26s\weights\best.pt

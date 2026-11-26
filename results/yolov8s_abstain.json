@@ -1,0 +1,71 @@
+{
+  "target_risk": 0.05,
+  "det_conf": 0.25,
+  "weights": "C:\\Users\\Dhananjay Vaidya\\Downloads\\runs_yolov8s\\yolov8s\\weights\\best.pt",
+  "split_set": "clean",
+  "val": {
+    "threshold": null,
+    "n_detections": 4058,
+    "n_accepted": 0,
+    "coverage": 0.0,
+    "selective_risk": 0.0,
+    "affiliation_accuracy": null,
+    "affiliation_accuracy_matched": null,
+    "false_alarms_accepted": 0,
+    "aurc": 0.148301045924091,
+    "no_abstention_accuracy": 0.42730409068506653,
+    "n_images": 2284
+  },
+  "test": {
+    "threshold": null,
+    "n_detections": 2050,
+    "n_accepted": 0,
+    "coverage": 0.0,
+    "selective_risk": 0.0,
+    "affiliation_accuracy": null,
+    "affiliation_accuracy_matched": null,
+    "false_alarms_accepted": 0,
+    "aurc": 0.11871178246568649,
+    "no_abstention_accuracy": 0.4121951219512195,
+    "n_images": 1098
+  },
+  "aircraft_c": {
+    "threshold": null,
+    "n_detections": 43928,
+    "n_accepted": 0,
+    "coverage": 0.0,
+    "selective_risk": 0.0,
+    "affiliation_accuracy": null,
+    "affiliation_accuracy_matched": null,
+    "false_alarms_accepted": 0,
+    "aurc": 0.2021310951581817,
+    "no_abstention_accuracy": 0.32862866508832633,
+    "n_conditions": 27
+  },
+  "seen": {
+    "threshold": null,
+    "n_detections": 33081,
+    "n_accepted": 0,
+    "coverage": 0.0,
+    "selective_risk": 0.0,
+    "affiliation_accuracy": null,
+    "affiliation_accuracy_matched": null,
+    "false_alarms_accepted": 0,
+    "aurc": 0.20657422085492774,
+    "no_abstention_accuracy": 0.3221184365647955,
+    "n_conditions": 21
+  },
+  "held_out": {
+    "threshold": null,
+    "n_detections": 10847,
+    "n_accepted": 0,
+    "coverage": 0.0,
+    "selective_risk": 0.0,
+    "affiliation_accuracy": null,
+    "affiliation_accuracy_matched": null,
+    "false_alarms_accepted": 0,
+    "aurc": 0.1898387898591459,
+    "no_abstention_accuracy": 0.3484834516456163,
+    "n_conditions": 6
+  }
+}

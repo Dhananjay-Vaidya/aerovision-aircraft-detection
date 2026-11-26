@@ -45,6 +45,9 @@
     "Mirage-III-V",
     "Saab-2000-Erieye"
   ],
+  "params": 9975728,
+  "params_M": 9.976,
+  "gflops": 22.89,
   "split_set": "full",
   "n_test_images": 1286,
   "weights": "C:\\Users\\Dhananjay Vaidya\\Downloads\\runs_yolo26s\\yolo26s\\weights\\best.pt",

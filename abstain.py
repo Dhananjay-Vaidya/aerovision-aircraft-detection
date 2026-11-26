@@ -17,7 +17,12 @@ box's true affiliation differs (a true `ambiguous`/`unknown` aircraft can never 
 --split-set clean (default): val and test use cvs_dataset/{val,test}_clean.txt (flipped/rotated near-copies of
 train images removed; see audit_leakage.py). --split-set full: every image, outputs named <name>_full_*.
 
-Writes results/<name>_abstain.json and results/<name>_riskcov.csv (risk-coverage curves, val + test).
+The same tau (from clean val) is then applied to Aircraft-C (data_derived/aircraft_c; only the test file names of
+the chosen split set), pooled over all 9 corruptions x 3 severities ("aircraft_c"), per group (seen / held_out) and
+per condition. --no-aircraft-c skips it.
+
+Writes results/<name>_abstain.json, results/<name>_riskcov.csv (risk-coverage curves: val, test, aircraft_c) and
+results/<name>_abstain_aircraft_c.csv (one row per corruption x severity).
 """
 from __future__ import annotations
 
@@ -28,7 +33,7 @@ from pathlib import Path
 
 import numpy as np
 
-from common import ROOT, SPLIT_SETS, load_affiliation, load_names, merged_dataset, merged_labels_dir, split_images
+from common import CORRUPTION_GROUP, ROOT, SPLIT_SETS, list_images, load_affiliation, load_names, merged_dataset, merged_labels_dir, split_images
 
 DEFINITE = ("allied", "adversary")
 
@@ -126,6 +131,8 @@ def main(argv=None):
     ap.add_argument("--results", default=str(ROOT / "results"))
     ap.add_argument("--split-set", choices=SPLIT_SETS, default="clean",
                     help="clean: val/test without train near-copies (default); full: all images")
+    ap.add_argument("--corrupt-root", default=str(ROOT / "data_derived" / "aircraft_c"))
+    ap.add_argument("--no-aircraft-c", action="store_true")
     args = ap.parse_args(argv)
 
     from ultralytics import YOLO
@@ -159,7 +166,39 @@ def main(argv=None):
             out["val"] = evaluate(score, correct, matched, tau)
         else:
             out["test"] = evaluate(score, correct, matched, tau)
+            test_stems = {p.stem for p in imgs}
         out[split]["n_images"] = len(imgs)
+
+    croot = Path(args.corrupt_root)
+    cond_rows = []
+    if not args.no_aircraft_c and croot.is_dir():
+        man = croot / "manifest.json"
+        groups = dict(CORRUPTION_GROUP)
+        if man.exists():
+            groups.update({c["name"]: c["group"] for c in json.loads(man.read_text(encoding="utf-8"))["corruptions"]
+                           if isinstance(c, dict)})
+        pooled = {"aircraft_c": [], "seen": [], "held_out": []}
+        for c in sorted(p for p in croot.iterdir() if p.is_dir()):
+            for s in sorted((p for p in c.iterdir() if (p / "images").is_dir()), key=lambda p: int(p.name)):
+                imgs = [p for p in list_images(s / "images") if p.stem in test_stems]
+                P, C, G = collect(model, imgs, s / "labels", args.conf, args.imgsz)
+                sc = score_and_correct(P, C, G, names, aff)
+                g = groups.get(c.name, "unknown")
+                for key in ("aircraft_c", g):
+                    if key in pooled:
+                        pooled[key].append(sc)
+                r = evaluate(*sc, tau)
+                cond_rows.append({"corruption": c.name, "severity": int(s.name), "group": g, "n_images": len(imgs),
+                                  **{k: r[k] for k in ("n_detections", "n_accepted", "coverage", "selective_risk",
+                                                       "affiliation_accuracy", "aurc")}})
+                print(f"[abstain.py] {c.name} s{s.name}: coverage={r['coverage']:.3f} risk={r['selective_risk']:.3f}")
+        for key, parts in pooled.items():
+            if parts:
+                cat = [np.concatenate([p[i] for p in parts]) for i in range(3)]
+                out[key] = evaluate(*cat, tau)
+                out[key]["n_conditions"] = len(parts)
+                if key == "aircraft_c":
+                    curves["aircraft_c"] = risk_coverage(cat[0], cat[1])
 
     res = Path(args.results)
     res.mkdir(parents=True, exist_ok=True)
@@ -169,6 +208,14 @@ def main(argv=None):
         w.writerow(["split", "threshold", "coverage", "risk"])
         for split, (th, cov, rk) in curves.items():
             w.writerows([split, f"{a:.5f}", f"{b:.5f}", f"{c:.5f}"] for a, b, c in zip(th, cov, rk))
+    if cond_rows:
+        with open(res / f"{name}_abstain_aircraft_c.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(cond_rows[0]))
+            w.writeheader()
+            w.writerows(cond_rows)
+        ac = out["aircraft_c"]
+        print(f"[abstain.py] AIRCRAFT-C coverage={ac['coverage']:.3f} selective_risk={ac['selective_risk']:.3f} "
+              f"affiliation_acc={ac['affiliation_accuracy']} AURC={ac['aurc']}")
     t = out["test"]
     print(f"[abstain.py] tau={tau:.4f} (val risk {out['val']['selective_risk']:.3f}, "
           f"coverage {out['val']['coverage']:.3f})")
