@@ -1,0 +1,5 @@
+model,mode,ms_mean,ms_std,ms_p50,ms_p95,fps,ul_preprocess_ms,ul_inference_ms,ul_postprocess_ms,params_M,gflops,imgsz,batch,precision,warmup,runs,gpu,torch,ultralytics,python,weights
+yolo26s,forward,12.111,4.012,10.442,21.180,82.569,,,,9.496,20.933,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,yolo26s.pt
+yolo26s,end_to_end,16.375,4.884,14.714,26.947,61.070,0.918,13.189,1.792,9.496,20.933,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,yolo26s.pt
+yolov8s,forward,9.093,3.874,7.791,15.440,109.980,,,,11.157,28.603,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,yolov8s.pt
+yolov8s,end_to_end,11.969,3.713,10.767,19.692,83.549,0.948,8.748,1.782,11.157,28.603,640,1,fp16,50,300,NVIDIA GeForce RTX 3050 A Laptop GPU,2.11.0+cu128,8.4.219,3.13.3,yolov8s.pt

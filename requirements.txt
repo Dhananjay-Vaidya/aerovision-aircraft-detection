@@ -1,0 +1,10 @@
+# Verified locally (Python 3.13, Windows 11, RTX 3050 4 GB).
+# PyTorch comes from the CUDA wheel index (Kaggle/Colab already have it):
+#   pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+ultralytics==8.4.219
+albumentations==2.0.8
+numpy==2.5.4
+opencv-python==5.1.0.95
+PyYAML==6.0.4
+pandas==3.1.1
+matplotlib==3.11.2

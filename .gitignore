@@ -1,0 +1,41 @@
+# --- environments & secrets ---
+venv/
+.venv/
+.env
+.env.*
+!.env.example
+
+# --- datasets & derived data (rebuild with build_dataset.py / corrupt.py) ---
+raw/
+cvs_dataset/
+data_derived/
+hash_cache.tsv
+
+# --- training runs & weights ---
+runs/
+models/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.safetensors
+
+# --- archives ---
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# --- caches ---
+__pycache__/
+*.py[cod]
+*.cache
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# --- smoke-test outputs (1 epoch / 64 images; not paper results) ---
+results/*limit*
+results/figures_smoke/
+
+# Committed on purpose: code (*.py), kaggle/, paper_assets/, results/, requirements.txt
