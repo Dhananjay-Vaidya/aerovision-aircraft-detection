@@ -3,7 +3,8 @@
   python summary_table.py [--models yolov8s yolo26s yolo26s_degrade]
 
 Reads (per model m): results/m_clean_test.json, m_full_test.json (eval_test.py), m.csv (evaluate.py, clean
-split), m_abstain.json + m_riskcov.csv (abstain.py, clean split), speed_trained.csv (speed.py).
+split), m_abstain.json + m_riskcov.csv (abstain.py, clean split), m_matched_abstain.json (abstain.py --risk-on
+matched), speed_trained.csv (speed.py) and abstain_error_diagnosis.json (diagnose_abstain.py; extra section).
 Also writes results/aircraft_c_all_models.csv: mAP per model x corruption x severity (long format).
 Sensitivity column: tau chosen on clean val at r* = 10% (from the saved val curve) and what it gives on clean test.
 """
@@ -72,8 +73,18 @@ def main(argv=None):
                 if split in a:
                     for k in ("coverage", "selective_risk", "affiliation_accuracy", "aurc"):
                         r[f"{split}_{k}"] = a[split][k]
+                    if split in ("val", "test", "aircraft_c"):
+                        r[f"{split}_fa100"] = a[split].get("false_alarms_per_100_images")
             curves = pd.read_csv(res / f"{m}_riskcov.csv")
             r["tau_r10"], r["test_coverage_r10"], r["test_risk_r10"] = at_risk(curves, 0.10)
+        abm = res / f"{m}_matched_abstain.json"  # abstain.py --risk-on matched
+        if abm.exists():
+            a = json.loads(abm.read_text())
+            r["m_tau_r5"] = a["val"]["threshold"]
+            for split in ("val", "test", "aircraft_c"):
+                if split in a:
+                    for k in ("coverage", "selective_risk", "aurc", "false_alarms_per_100_images"):
+                        r[f"m_{split}_{k}"] = a[split][k]
         if speed is not None:
             for mode in ("forward", "end_to_end"):
                 sel = speed[(speed.model == m) & (speed["mode"] == mode)]
@@ -101,20 +112,59 @@ def main(argv=None):
              ("mPC seen (mAP@50)", "mPC_seen_map50", True, 1), ("mPC held-out (mAP@50)", "mPC_held_out_map50", True, 1),
              ("mPC all (mAP@50)", "mPC_all_map50", True, 1), ("rPC all (mAP@50)", "rPC_all_map50", True, 1),
              ("mPC all (mAP@50:95)", "mPC_all_map50_95", True, 1), ("rPC all (mAP@50:95)", "rPC_all_map50_95", True, 1),
-             ("τ (clean val, r*=5%)", "tau_r5", False, 3),
-             ("Coverage, clean test", "test_coverage", True, 1), ("Selective risk, clean test", "test_selective_risk", True, 1),
-             ("Affiliation acc., clean test", "test_affiliation_accuracy", True, 1), ("AURC, clean test", "test_aurc", False, 3),
-             ("Coverage, Aircraft-C", "aircraft_c_coverage", True, 1),
-             ("Selective risk, Aircraft-C", "aircraft_c_selective_risk", True, 1),
-             ("Affiliation acc., Aircraft-C", "aircraft_c_affiliation_accuracy", True, 1),
-             ("AURC, Aircraft-C", "aircraft_c_aurc", False, 3),
-             ("FP16 forward (ms)", "ms_forward", False, 2), ("FP16 end-to-end (ms)", "ms_end_to_end", False, 2),
+             ("**Abstention, risk on all detections** (false alarm = error)", None, False, 0),
+             ("τ (clean val, r*=5%)", "tau_r5", False, 3)]
+    for split, lab in (("val", "clean val"), ("test", "clean test"), ("aircraft_c", "Aircraft-C")):
+        specs += [(f"Coverage, {lab}", f"{split}_coverage", True, 1),
+                  (f"Selective risk, {lab}", f"{split}_selective_risk", True, 1),
+                  (f"AURC, {lab}", f"{split}_aurc", False, 3),
+                  (f"Accepted false alarms / 100 images, {lab}", f"{split}_fa100", False, 2)]
+    specs += [("**Abstention, risk on matched detections** (affiliation risk on detected aircraft)", None, False, 0),
+              ("τ (clean val, r*=5%)", "m_tau_r5", False, 3)]
+    for split, lab in (("val", "clean val"), ("test", "clean test"), ("aircraft_c", "Aircraft-C")):
+        specs += [(f"Coverage, {lab}", f"m_{split}_coverage", True, 1),
+                  (f"Selective risk, {lab}", f"m_{split}_selective_risk", True, 1),
+                  (f"AURC, {lab}", f"m_{split}_aurc", False, 3),
+                  (f"Accepted false alarms / 100 images, {lab}", f"m_{split}_false_alarms_per_100_images", False, 2)]
+    specs += [("**Speed** (FP16, batch 1)", None, False, 0),
+              ("FP16 forward (ms)", "ms_forward", False, 2), ("FP16 end-to-end (ms)", "ms_end_to_end", False, 2),
              ("FPS end-to-end", "fps_end_to_end", False, 1)]
     md = ["| Metric | " + " | ".join(r["model"] for r in rows) + " |", "|---|" + "---|" * len(rows)]
     for label, key, pct, nd in specs:
+        if key is None:  # section header row
+            md.append(f"| {label} |" + " |" * len(rows))
+            continue
         md.append(f"| {label} | " + " | ".join(f(r.get(key), pct, nd) for r in rows) + " |")
+    md += diagnosis_md(res)
     (res / "summary.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
+
+
+def diagnosis_md(res: Path) -> list[str]:
+    """Section from diagnose_abstain.py (results/abstain_error_diagnosis.json), if present."""
+    p = res / "abstain_error_diagnosis.json"
+    if not p.exists():
+        return []
+    d = json.loads(p.read_text(encoding="utf-8"))
+    mc = d["min_conf"]
+    out = ["", f"### Confident affiliation errors (conf ≥ {mc}, clean splits; diagnose_abstain.py)", "",
+           "| Model | Split | Dets ≥ conf (definite) | Errors | (a1) FA, more dets than GT | (a2) FA, other "
+           "[in images with stacked GT] | (b) wrong affiliation [GT other_aircraft] |",
+           "|---|---|---|---|---|---|---|"]
+    pairs_lines = []
+    for m, v in d["models"].items():
+        pooled = {}
+        for split, x in v.items():
+            out.append(f"| {LABEL.get(m, m)} | {split} | {x['n_conf_detections']} ({x['n_conf_definite']}) | "
+                       f"{x['n_errors']} | {x['a1_more_dets_than_gt']} | {x['a2_other']} "
+                       f"[{x.get('a2_in_images_with_stacked_gt', '–')}] | {x['b_wrong_affiliation']} "
+                       f"[{x.get('b_gt_other_aircraft', '–')}] |")
+            for k, n in x["b_pairs"].items():
+                pooled[k] = pooled.get(k, 0) + n
+        top = sorted(pooled.items(), key=lambda kv: -kv[1])[:8]
+        pairs_lines.append(f"- {LABEL.get(m, m)} (val + test), predicted → GT: " +
+                           ", ".join(f"{k.replace(' -> ', ' → ')} ({n})" for k, n in top))
+    return out + ["", "Most frequent (b) pairs:", ""] + pairs_lines
 
 
 if __name__ == "__main__":

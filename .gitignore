@@ -41,6 +41,7 @@ results/figures_smoke/
 # --- photographs: never commit dataset or third-party images ---
 dupes_sample.jpg
 results/leakage_pairs.jpg
+results/abstain_errors.jpg
 *.jpg
 *.jpeg
 *.webp

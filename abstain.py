@@ -14,6 +14,11 @@ box's true affiliation differs (a true `ambiguous`/`unknown` aircraft can never 
   coverage = accepted / all detections        risk = errors / accepted
   affiliation accuracy = 1 - risk  (and, separately, accuracy on accepted detections that match a GT box)
 
+--risk-on all (default): the above, over every detection. --risk-on matched: risk, coverage, tau and AURC only over
+detections matched to a GT box, i.e. the affiliation risk on detected aircraft; accepted false alarms (unmatched
+detections with conf >= tau) are reported separately as false_alarms_per_100_images (reported in both modes).
+--risk-on all matched computes both from one prediction pass; matched-mode outputs are named <name>_matched_*.
+
 --split-set clean (default): val and test use cvs_dataset/{val,test}_clean.txt (flipped/rotated near-copies of
 train images removed; see audit_leakage.py). --split-set full: every image, outputs named <name>_full_*.
 
@@ -36,6 +41,7 @@ import numpy as np
 from common import CORRUPTION_GROUP, ROOT, SPLIT_SETS, list_images, load_affiliation, load_names, merged_dataset, merged_labels_dir, split_images
 
 DEFINITE = ("allied", "adversary")
+RISK_MODES = ("all", "matched")
 
 
 def iou_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -56,8 +62,13 @@ def read_gt(label: Path, w: int, h: int):
     return np.stack([xc - bw / 2, yc - bh / 2, xc + bw / 2, yc + bh / 2], 1), cls
 
 
-def collect(model, images: list[Path], labels_dir: Path, conf: float, imgsz: int, iou_thr: float = 0.5):
-    """Returns per-detection arrays: pred class, confidence, matched GT class (-1 = false alarm)."""
+def collect(model, images: list[Path], labels_dir: Path, conf: float, imgsz: int, iou_thr: float = 0.5,
+            details: list | None = None):
+    """Returns per-detection arrays: pred class, confidence, matched GT class (-1 = false alarm).
+
+    If `details` is a list, one dict per image is appended (path, gt_box, gt_cls, and the detections in the same
+    order as the returned arrays: box, cls, conf, gt index or -1); used by diagnose_abstain.py.
+    """
     P, C, G = [], [], []
     for i in range(0, len(images), 32):
         for r in model.predict([str(p) for p in images[i:i + 32]], conf=conf, imgsz=imgsz, half=True,
@@ -70,6 +81,7 @@ def collect(model, images: list[Path], labels_dir: Path, conf: float, imgsz: int
             order = np.argsort(-pf)
             ious = iou_matrix(box[order], gt_box)
             used = np.zeros(len(gt_box), bool)
+            gidx = []
             for j, k in enumerate(order):  # greedy, highest confidence first, class-agnostic
                 g = -1
                 if len(gt_box):
@@ -77,7 +89,11 @@ def collect(model, images: list[Path], labels_dir: Path, conf: float, imgsz: int
                     if cand.max() >= iou_thr:
                         g = int(cand.argmax())
                         used[g] = True
+                gidx.append(g)
                 P.append(pc[k]); C.append(pf[k]); G.append(gt_cls[g] if g >= 0 else -1)
+            if details is not None:
+                details.append({"path": Path(r.path), "gt_box": gt_box, "gt_cls": gt_cls, "box": box[order],
+                                "cls": pc[order], "conf": pf[order], "gt": np.array(gidx, int)})
     return np.array(P, int), np.array(C, float), np.array(G, int)
 
 
@@ -101,18 +117,33 @@ def risk_coverage(score, correct):
     return s[:k_max], k / max(n, 1), errors / k  # thresholds, coverage, risk
 
 
-def evaluate(score, correct, matched, tau):
+def select(sc, risk_on: str):
+    """Detections that risk and coverage are computed over: all of them, or only those matched to a GT box."""
+    score, correct, matched = sc
+    if risk_on == "all":
+        return score, correct, matched
+    return score[matched], correct[matched], matched[matched]
+
+
+def evaluate(score, correct, matched, tau, risk_on: str = "all", n_images: int | None = None):
+    # accepted false alarms are counted over all detections in both modes (in "matched" mode they are outside
+    # the risk / coverage and reported only here)
+    fa = int(((score >= tau) & ~matched).sum())
+    n_all = len(score)
+    score, correct, matched = select((score, correct, matched), risk_on)
     acc = score >= tau
     n, na = len(score), int(acc.sum())
     risk = float((~correct[acc]).sum() / na) if na else 0.0
     m = acc & matched
     th, cov, rk = risk_coverage(score, correct)
     return {
+        "risk_on": risk_on,
         "threshold": float(tau) if np.isfinite(tau) else None,  # None = no threshold met the target: abstain all
-        "n_detections": n, "n_accepted": na,
+        "n_detections": n, "n_detections_all": n_all, "n_accepted": na,
         "coverage": na / n if n else 0.0, "selective_risk": risk, "affiliation_accuracy": 1 - risk if na else None,
         "affiliation_accuracy_matched": float(correct[m].mean()) if m.any() else None,
-        "false_alarms_accepted": int((acc & ~matched).sum()),
+        "false_alarms_accepted": fa,
+        "false_alarms_per_100_images": 100 * fa / n_images if n_images else None,
         "aurc": float(rk.mean()) if len(rk) else None,
         "no_abstention_accuracy": float(correct.mean()) if n else None,  # every detection forced to a label
     }
@@ -133,6 +164,10 @@ def main(argv=None):
                     help="clean: val/test without train near-copies (default); full: all images")
     ap.add_argument("--corrupt-root", default=str(ROOT / "data_derived" / "aircraft_c"))
     ap.add_argument("--no-aircraft-c", action="store_true")
+    ap.add_argument("--risk-on", nargs="+", choices=RISK_MODES, default=["all"],
+                    help="all: risk/coverage over every detection, a false alarm is an error (default); matched: only "
+                         "detections matched to a GT box (affiliation risk on detected aircraft), accepted false "
+                         "alarms reported separately per 100 images. Both: --risk-on all matched (one pass)")
     args = ap.parse_args(argv)
 
     from ultralytics import YOLO
@@ -151,77 +186,88 @@ def main(argv=None):
     if len(model.names) != len(names):
         raise SystemExit(f"model has {len(model.names)} classes but data.yaml has {len(names)}")
 
-    out, curves = {"target_risk": args.target_risk, "det_conf": args.conf, "weights": str(weights),
-                   "split_set": args.split_set}, {}
+    # ---- predictions (once; every risk mode is computed from them) ----
+    data = {}  # split / condition -> (score, correct, matched), n_images
     for split in ("val", "test"):
         imgs = split_images(data_yaml, split)
         imgs = imgs[: args.limit] if args.limit else imgs
         P, C, G = collect(model, imgs, merged_labels_dir(data_yaml, split), args.conf, args.imgsz)
-        score, correct, matched = score_and_correct(P, C, G, names, aff)
-        th, cov, rk = risk_coverage(score, correct)
-        curves[split] = (th, cov, rk)
-        if split == "val":
-            ok = np.where(rk <= args.target_risk)[0]
-            tau = float(th[ok.max()]) if len(ok) else float("inf")   # max coverage meeting the target
-            out["val"] = evaluate(score, correct, matched, tau)
-        else:
-            out["test"] = evaluate(score, correct, matched, tau)
+        data[split] = (score_and_correct(P, C, G, names, aff), len(imgs))
+        if split == "test":
             test_stems = {p.stem for p in imgs}
-        out[split]["n_images"] = len(imgs)
 
     croot = Path(args.corrupt_root)
-    cond_rows = []
+    conds = []  # (corruption, severity, group, sc, n_images)
     if not args.no_aircraft_c and croot.is_dir():
         man = croot / "manifest.json"
         groups = dict(CORRUPTION_GROUP)
         if man.exists():
             groups.update({c["name"]: c["group"] for c in json.loads(man.read_text(encoding="utf-8"))["corruptions"]
                            if isinstance(c, dict)})
-        pooled = {"aircraft_c": [], "seen": [], "held_out": []}
         for c in sorted(p for p in croot.iterdir() if p.is_dir()):
             for s in sorted((p for p in c.iterdir() if (p / "images").is_dir()), key=lambda p: int(p.name)):
                 imgs = [p for p in list_images(s / "images") if p.stem in test_stems]
                 P, C, G = collect(model, imgs, s / "labels", args.conf, args.imgsz)
-                sc = score_and_correct(P, C, G, names, aff)
-                g = groups.get(c.name, "unknown")
-                for key in ("aircraft_c", g):
-                    if key in pooled:
-                        pooled[key].append(sc)
-                r = evaluate(*sc, tau)
-                cond_rows.append({"corruption": c.name, "severity": int(s.name), "group": g, "n_images": len(imgs),
-                                  **{k: r[k] for k in ("n_detections", "n_accepted", "coverage", "selective_risk",
-                                                       "affiliation_accuracy", "aurc")}})
-                print(f"[abstain.py] {c.name} s{s.name}: coverage={r['coverage']:.3f} risk={r['selective_risk']:.3f}")
-        for key, parts in pooled.items():
-            if parts:
-                cat = [np.concatenate([p[i] for p in parts]) for i in range(3)]
-                out[key] = evaluate(*cat, tau)
-                out[key]["n_conditions"] = len(parts)
-                if key == "aircraft_c":
-                    curves["aircraft_c"] = risk_coverage(cat[0], cat[1])
+                conds.append((c.name, int(s.name), groups.get(c.name, "unknown"),
+                              score_and_correct(P, C, G, names, aff), len(imgs)))
+                print(f"[abstain.py] predicted {c.name} s{s.name} ({len(imgs)} images)")
 
     res = Path(args.results)
     res.mkdir(parents=True, exist_ok=True)
-    (res / f"{name}_abstain.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
-    with open(res / f"{name}_riskcov.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["split", "threshold", "coverage", "risk"])
-        for split, (th, cov, rk) in curves.items():
-            w.writerows([split, f"{a:.5f}", f"{b:.5f}", f"{c:.5f}"] for a, b, c in zip(th, cov, rk))
-    if cond_rows:
-        with open(res / f"{name}_abstain_aircraft_c.csv", "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=list(cond_rows[0]))
-            w.writeheader()
-            w.writerows(cond_rows)
-        ac = out["aircraft_c"]
-        print(f"[abstain.py] AIRCRAFT-C coverage={ac['coverage']:.3f} selective_risk={ac['selective_risk']:.3f} "
-              f"affiliation_acc={ac['affiliation_accuracy']} AURC={ac['aurc']}")
-    t = out["test"]
-    print(f"[abstain.py] tau={tau:.4f} (val risk {out['val']['selective_risk']:.3f}, "
-          f"coverage {out['val']['coverage']:.3f})")
-    print(f"[abstain.py] TEST coverage={t['coverage']:.3f} selective_risk={t['selective_risk']:.3f} "
-          f"affiliation_acc={t['affiliation_accuracy']} AURC={t['aurc']}")
-    print(f"[abstain.py] wrote {res / (name + '_abstain.json')}")
+    for mode in args.risk_on:
+        mname = name if mode == "all" else f"{name}_{mode}"
+        out = {"target_risk": args.target_risk, "det_conf": args.conf, "weights": str(weights),
+               "split_set": args.split_set, "risk_on": mode}
+        curves = {}
+        for split in ("val", "test"):
+            sc, n_img = data[split]
+            th, cov, rk = risk_coverage(*select(sc, mode)[:2])
+            curves[split] = (th, cov, rk)
+            if split == "val":
+                ok = np.where(rk <= args.target_risk)[0]
+                tau = float(th[ok.max()]) if len(ok) else float("inf")   # max coverage meeting the target
+            out[split] = evaluate(*sc, tau, mode, n_img)
+            out[split]["n_images"] = n_img
+
+        cond_rows = []
+        pooled = {"aircraft_c": [], "seen": [], "held_out": []}
+        for cname, sev, g, sc, n_img in conds:
+            for key in ("aircraft_c", g):
+                if key in pooled:
+                    pooled[key].append((sc, n_img))
+            r = evaluate(*sc, tau, mode, n_img)
+            cond_rows.append({"corruption": cname, "severity": sev, "group": g, "n_images": n_img,
+                              **{k: r[k] for k in ("n_detections", "n_accepted", "coverage", "selective_risk",
+                                                   "affiliation_accuracy", "false_alarms_per_100_images", "aurc")}})
+        for key, parts in pooled.items():
+            if parts:
+                cat = [np.concatenate([p[0][i] for p in parts]) for i in range(3)]
+                n_img = sum(p[1] for p in parts)
+                out[key] = evaluate(*cat, tau, mode, n_img)
+                out[key]["n_conditions"] = len(parts)
+                out[key]["n_images"] = n_img
+                if key == "aircraft_c":
+                    curves["aircraft_c"] = risk_coverage(*select(cat, mode)[:2])
+
+        (res / f"{mname}_abstain.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+        with open(res / f"{mname}_riskcov.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["split", "threshold", "coverage", "risk"])
+            for split, (th, cov, rk) in curves.items():
+                w.writerows([split, f"{a:.5f}", f"{b:.5f}", f"{c:.5f}"] for a, b, c in zip(th, cov, rk))
+        if cond_rows:
+            with open(res / f"{mname}_abstain_aircraft_c.csv", "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=list(cond_rows[0]))
+                w.writeheader()
+                w.writerows(cond_rows)
+        print(f"[abstain.py] risk on {mode}: tau={tau:.4f}")
+        for split in ("val", "test", "aircraft_c"):
+            if split in out:
+                o = out[split]
+                fmt = lambda v, nd=3: "n/a" if v is None else f"{v:.{nd}f}"
+                print(f"[abstain.py]   {split:10s} coverage={fmt(o['coverage'])} risk={fmt(o['selective_risk'])} "
+                      f"AURC={fmt(o['aurc'])} accepted FA/100 img={fmt(o['false_alarms_per_100_images'], 2)}")
+        print(f"[abstain.py] wrote {res / (mname + '_abstain.json')}")
 
 
 if __name__ == "__main__":

@@ -6,11 +6,12 @@
 
   robustness_vs_severity_<metric>  mAP vs severity (0 = clean), one panel per Aircraft-C corruption (held-out
                                    panels shaded) + mean over seen / held-out / all; one line per model
-  risk_coverage                    selective risk vs coverage of the affiliation decision for the best model:
+  risk_coverage                    selective risk vs coverage of the affiliation decision, every model: (a) risk
+                                   on all detections, (b) risk on matched detections (abstain.py --risk-on matched);
                                    clean test vs all of Aircraft-C, target risk r* and the operating point (tau)
   per_class_ap                     per-class AP@50 on clean test for the best model, bars coloured by affiliation
 
-"Best model" = highest clean-test mAP@50 among the models plotted (override with --best).
+"Best model" (per-class AP) = highest clean-test mAP@50 among the models plotted (override with --best).
 Inputs: evaluate.py -> <m>.csv, <m>_per_class.csv; abstain.py -> <m>_abstain.json, <m>_riskcov.csv.
 Smoke-test results (names containing "limit") are skipped unless named with --models.
 """
@@ -136,38 +137,58 @@ def robustness(res: Path, models, out: Path, metric: str, sfx: str):
     save(fig, out, f"robustness_vs_severity_{metric}")
 
 
-def risk_coverage(res: Path, m: str, out: Path, sfx: str):
-    rc, ab = res / f"{m}{sfx}_riskcov.csv", res / f"{m}{sfx}_abstain.json"
-    if not rc.exists():
-        print(f"[figures.py] no {rc.name}; risk-coverage skipped")
+def risk_coverage(res: Path, models, out: Path, sfx: str):
+    """Two panels: (a) risk over all detections (false alarm = error), (b) risk over detections matched to a GT
+    box (abstain.py --risk-on matched). Every model; clean test solid, Aircraft-C dashed; circles = operating
+    point at tau chosen on clean val for r*."""
+    from matplotlib.lines import Line2D
+
+    panels = [("", "(a) Risk on all detections"), ("_matched", "(b) Risk on matched detections")]
+    panels = [(k, t) for k, t in panels if any((res / f"{m}{sfx}{k}_riskcov.csv").exists() for m in models)]
+    if not panels:
+        print("[figures.py] no *_riskcov.csv; risk-coverage skipped")
         return
-    df = pd.read_csv(rc)
-    info = json.loads(ab.read_text()) if ab.exists() else {}
-    fig, ax = plt.subplots(figsize=(WIDTH, 6.0 * CM))
-    for split, label, ls, color in (("test", "Clean test", "-", "#1f77b4"),
-                                    ("aircraft_c", "Aircraft-C (9 corruptions $\\times$ 3 severities)", "--",
-                                     "#d62728")):
-        d = df[df["split"] == split]
-        if d.empty:
-            continue
-        ax.plot(d["coverage"], d["risk"], ls=ls, color=color, label=label)
-        op = info.get(split)
-        if op and op.get("n_accepted"):
-            ax.plot(op["coverage"], op["selective_risk"], "o", color=color, ms=4, mfc="white", mew=1.0)
-    if "target_risk" in info:
-        tau = info.get("val", {}).get("threshold")
-        ax.axhline(info["target_risk"], ls=":", color="black", lw=0.8,
-                   label=f"Target risk $r^*$ = {info['target_risk']:.0%}" +
-                         (f" ($\\tau$ = {tau:.3f} from clean val: circles)" if tau is not None else ""))
-    ax.set_xlabel("Coverage (fraction of detections given an affiliation)")
-    ax.set_ylabel("Selective risk")
+    fig, axes = plt.subplots(1, len(panels), figsize=(WIDTH, 6.2 * CM), sharey=True, squeeze=False)
+    target, xmax = None, 0.0
+    for ax, (kind, title) in zip(axes[0], panels):
+        for m in models:
+            rc, ab = res / f"{m}{sfx}{kind}_riskcov.csv", res / f"{m}{sfx}{kind}_abstain.json"
+            if not rc.exists():
+                continue
+            df = pd.read_csv(rc)
+            info = json.loads(ab.read_text()) if ab.exists() else {}
+            target = info.get("target_risk", target)
+            _, color, _ = style(m, models)
+            for split, ls in (("test", "-"), ("aircraft_c", "--")):
+                d = df[df["split"] == split]
+                if d.empty:
+                    continue
+                xmax = max(xmax, float(d["coverage"].max()))
+                ax.plot(d["coverage"], d["risk"], ls=ls, color=color)
+                op = info.get(split)
+                if op and op.get("n_accepted"):
+                    ax.plot(op["coverage"], op["selective_risk"], "o", color=color, ms=4, mfc="white", mew=1.0)
+        if target is not None:
+            ax.axhline(target, ls=":", color="black", lw=0.8)
+        ax.set_title(title, pad=2)
+        ax.set_xlabel("Coverage")
+        ax.grid(alpha=0.3, lw=0.4)
     # curves end below 1: detections of ambiguous / unknown classes are never given an affiliation
-    ax.set_xlim(0, min(1.0, np.ceil(df["coverage"].max() * 10 + 0.5) / 10))
-    ax.set_ylim(0, None)
-    ax.grid(alpha=0.3, lw=0.4)
-    ax.legend(loc="upper left", frameon=False)
-    ax.set_title(style(m)[0], pad=2)
-    fig.tight_layout()
+    for ax in axes[0]:
+        ax.set_xlim(0, min(1.0, np.ceil(xmax * 10 + 0.5) / 10))
+    axes[0, 0].set_ylim(0, None)
+    axes[0, 0].set_ylabel("Selective risk")
+    handles = [Line2D([], [], color=style(m, models)[1], label=style(m, models)[0]) for m in models
+               if (res / f"{m}{sfx}_riskcov.csv").exists()]
+    handles += [Line2D([], [], color="0.3", ls="-", label="Clean test"),
+                Line2D([], [], color="0.3", ls="--", label="Aircraft-C"),
+                Line2D([], [], color="0.3", ls="", marker="o", mfc="white", ms=4,
+                       label="$\\tau$ from clean val")]
+    if target is not None:
+        handles.append(Line2D([], [], color="black", ls=":", lw=0.8, label=f"$r^*$ = {target:.0%}"))
+    fig.legend(handles=handles, loc="upper center", ncol=len(handles), frameon=False, bbox_to_anchor=(0.5, 1.0),
+               columnspacing=1.0, handlelength=1.8)
+    fig.tight_layout(rect=(0, 0, 1, 0.9), w_pad=0.6)
     save(fig, out, "risk_coverage")
 
 
@@ -215,7 +236,7 @@ def main(argv=None):
     print(f"[figures.py] split set {args.split_set}: {models}; best (clean mAP@50) = {best}")
     robustness(res, models, out, "map50", sfx)
     robustness(res, models, out, "map50_95", sfx)
-    risk_coverage(res, best, out, sfx)
+    risk_coverage(res, models, out, sfx)
     per_class(res, best, out, sfx)
 
 
