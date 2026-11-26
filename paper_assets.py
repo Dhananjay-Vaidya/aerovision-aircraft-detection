@@ -229,9 +229,28 @@ def dedupe_stats(report, rows, tot, dedupe, raw: Path, out: Path):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Aircraft-C example image: only merge_dataset (CC BY 4.0, SuperRadarOSINT) images may appear in the paper, never the
+# web-collected own/fyp images. Chosen by eye from the clean test split: one F-16, fully visible against the sky.
+EXAMPLE_IMAGE = "merge_test_000310.jpg"
+MERGE_URL = "https://universe.roboflow.com/superradarosint/merge_dataset-9nrmd"
+
+
+def _manifest(ds: Path) -> dict:
+    with open(ds / "manifest.csv", encoding="utf-8") as f:
+        return {r["file"]: r for r in csv.DictReader(f)}
+
+
 def pick_example(ds: Path, names: list[str]) -> Path:
-    """First test image (sorted) with one non-'other' aircraft covering 8-35% of the frame, away from the border."""
+    """EXAMPLE_IMAGE if present, else the first clean-test merge_dataset image (sorted) with one non-'other'
+    aircraft covering 8-35% of the frame, away from the border."""
+    man = _manifest(ds)
+    if (ds / "images" / "test" / EXAMPLE_IMAGE).exists():
+        return ds / "images" / "test" / EXAMPLE_IMAGE
+    clean = ds / "test_clean.txt"
+    keep = {Path(l.strip()).name for l in clean.read_text().splitlines() if l.strip()} if clean.exists() else None
     for img in list_images(ds / "images" / "test"):
+        if man.get(img.name, {}).get("source") != "merge" or (keep is not None and img.name not in keep):
+            continue
         lbl = ds / "labels" / "test" / (img.stem + ".txt")
         rows = [l.split() for l in lbl.read_text().splitlines() if l.strip()] if lbl.exists() else []
         if len(rows) != 1:
@@ -239,11 +258,27 @@ def pick_example(ds: Path, names: list[str]) -> Path:
         c, x, y, w, h = int(rows[0][0]), *map(float, rows[0][1:5])
         if names[c] != OTHER_CLASS and 0.08 <= w * h <= 0.35 and 0.3 < x < 0.7 and 0.3 < y < 0.7:
             return img
-    return list_images(ds / "images" / "test")[0]
+    raise SystemExit("no suitable merge_dataset test image for fig_aircraft_c; pass --image")
+
+
+def write_credit(ds: Path, img_path: Path, out: Path):
+    row = _manifest(ds).get(img_path.name)
+    if row is None or row["source"] != "merge":
+        raise SystemExit(f"{img_path.name} is not a merge_dataset image: it must not appear in the paper")
+    lines = ["Example image in fig_aircraft_c (pdf/png):",
+             f"  dataset file:      cvs_dataset/images/test/{img_path.name}",
+             f"  source filename:   {Path(row['original_path']).name}",
+             f"  source dataset:    merge_dataset (SuperRadarOSINT), {MERGE_URL}",
+             "  licence:           CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
+             "  modifications:     corrupted with Aircraft-C (corrupt.py, seed 1234) at 9 corruptions x 3 severities",
+             "Suggested caption credit: \"Example image from merge_dataset by SuperRadarOSINT (Roboflow Universe), "
+             "CC BY 4.0; corruptions ours.\""]
+    (out / "fig_aircraft_c_credit.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def fig_aircraft_c(ds: Path, names, out: Path, image: Path | None, seed: int = 1234):
     img_path = image or pick_example(ds, names)
+    write_credit(ds, img_path, out)
     img = cv2.imread(str(img_path))
     panels = [(c, s) for c in SEEN_CORRUPTIONS + HELD_OUT_CORRUPTIONS for s in (1, 2, 3)] + [("clean", 0)]
     ncol, nrow = 6, int(np.ceil(len(panels) / 6))

@@ -1,0 +1,49 @@
+nc: 36
+names:
+  0: Su-30MKI
+  1: Rafale
+  2: Tejas
+  3: Mirage-2000
+  4: MiG-29
+  5: Jaguar
+  6: C-17
+  7: C-130J
+  8: C-295
+  9: An-32
+  10: AH-64
+  11: CH-47
+  12: HAL-Prachand
+  13: HAL-Dhruv
+  14: HAL-Rudra
+  15: HAL-LUH
+  16: HAL-Chetak
+  17: Mi-26
+  18: J-20
+  19: J-10
+  20: J-16
+  21: J-11
+  22: H-6
+  23: Y-20
+  24: JH-7
+  25: KJ-500
+  26: Z-10
+  27: WZ-7
+  28: JF-17
+  29: F-16
+  30: Mirage-III-V
+  31: Saab-2000-Erieye
+  32: Mi-8-17
+  33: Il-76-78
+  34: Mi-24-35
+  35: other_aircraft
+merged_into_other:
+  other_aircraft:
+  - Su-30MKI
+  - Jaguar
+  - J-16
+  - J-11
+  - KJ-500
+  - Mirage-III-V
+  - Saab-2000-Erieye
+merge_rule: classes with < 50 training images are relabelled other_aircraft; ids are
+  unchanged, so merged ids have no boxes

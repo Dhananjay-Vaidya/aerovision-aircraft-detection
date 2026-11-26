@@ -1,0 +1,25 @@
+AeroVision aircraft dataset: labels, splits and the Aircraft-C benchmark
+Copyright (c) 2026 Dhananjay Vaidya and Monika Mangla
+
+ANNOTATIONS, SPLITS AND METADATA
+The files in this directory (YOLO label files, class lists, affiliation mapping, split lists, sources.csv, the
+Aircraft-C manifest, reports and documentation) are licensed under the Creative Commons Attribution 4.0
+International licence (CC BY 4.0).
+  Summary:    https://creativecommons.org/licenses/by/4.0/
+  Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+You may share and adapt them for any purpose, provided you give appropriate credit, link to the licence and
+indicate if changes were made.
+
+IMAGES ARE NOT INCLUDED
+No image is distributed with this release. Every image remains the property of its original owner and is subject
+to that owner's terms. sources.csv only names the Roboflow project and file each label refers to. Obtaining the
+images (see rebuild.md) is your responsibility and is governed by the terms of each source.
+
+THIRD-PARTY CONTENT: merge_dataset
+Labels for images whose source is "merge" are derived from merge_dataset by SuperRadarOSINT,
+https://universe.roboflow.com/superradarosint/merge_dataset-9nrmd, licensed under CC BY 4.0.
+Changes made: class names mapped to our class list, boxes of unmapped classes dropped, duplicates removed,
+re-split, and rare classes merged into other_aircraft. This content is redistributed only as labels, with this
+attribution.
+
+The code in the parent repository is licensed separately (see ../LICENSE).

@@ -1,0 +1,123 @@
+{
+  "name": "Aircraft-C",
+  "generator": "corrupt.py",
+  "seed": 1234,
+  "severities": [
+    1,
+    2,
+    3
+  ],
+  "source_split": "test",
+  "n_source_images": 1286,
+  "labels": "same merged labels as the source test image (labels/test)",
+  "storage_jpeg_quality": 95,
+  "corruptions": [
+    {
+      "name": "defocus_blur",
+      "group": "seen",
+      "params": [
+        3,
+        6,
+        9
+      ]
+    },
+    {
+      "name": "motion_blur",
+      "group": "seen",
+      "params": [
+        9,
+        17,
+        27
+      ]
+    },
+    {
+      "name": "fog",
+      "group": "seen",
+      "params": [
+        0.35,
+        0.55,
+        0.75
+      ]
+    },
+    {
+      "name": "low_light",
+      "group": "seen",
+      "params": [
+        [
+          0.55,
+          1.4,
+          0.01
+        ],
+        [
+          0.35,
+          1.8,
+          0.02
+        ],
+        [
+          0.18,
+          2.2,
+          0.03
+        ]
+      ]
+    },
+    {
+      "name": "gaussian_noise",
+      "group": "seen",
+      "params": [
+        0.06,
+        0.12,
+        0.2
+      ]
+    },
+    {
+      "name": "jpeg",
+      "group": "seen",
+      "params": [
+        30,
+        15,
+        7
+      ]
+    },
+    {
+      "name": "downscale",
+      "group": "seen",
+      "params": [
+        0.5,
+        0.3,
+        0.18
+      ]
+    },
+    {
+      "name": "contrast",
+      "group": "held_out",
+      "params": [
+        0.5,
+        0.3,
+        0.15
+      ]
+    },
+    {
+      "name": "rain",
+      "group": "held_out",
+      "params": [
+        [
+          0.0015,
+          12,
+          0.55
+        ],
+        [
+          0.003,
+          18,
+          0.65
+        ],
+        [
+          0.006,
+          26,
+          0.75
+        ]
+      ]
+    }
+  ],
+  "per_image_seed": "zlib.crc32(f'{seed}|{corruption}|{severity}|{filename}')",
+  "clean_evaluation": "papers report Aircraft-C on the images in splits/test_clean.txt only"
+}

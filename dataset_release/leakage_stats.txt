@@ -1,0 +1,76 @@
+Leakage audit (audit_leakage.py; same check as the last step of build_dataset.py)
+Rule: a val image (vs all train) or test image (vs all train + val) is flagged if, for one of its
+variants none/hflip/vflip/rot180, both the whole-image pHash and the largest-box-crop pHash are within
+Hamming distance 6 of the same reference image. Flagged images are excluded from
+val_clean.txt / test_clean.txt; nothing is moved or deleted.
+Classes are after the merge rule (< 50 training images -> other_aircraft: Su-30MKI, Jaguar, J-16, J-11, KJ-500, Mirage-III-V, Saab-2000-Erieye).
+
+== Flagged ==
+val   flagged   292 / 2576  ( 11.3%)   clean 2284
+test  flagged   188 / 1286  ( 14.6%)   clean 1098
+total flagged 480 / 3862 (12.4%)
+
+== By transform of the closest match (none = untransformed copy) ==
+transform     val   test  total
+none           93     57    150
+hflip         137     89    226
+vflip          32     25     57
+rot180         30     17     47
+
+== By source of the flagged image ==
+source             val        test
+fyp              8/168        5/85
+merge         152/1616     106/806
+own            132/792      77/395
+
+== Source pair (flagged image source -> matched image source) ==
+test     fyp -> own    (train)     4
+test     fyp -> own    (val  )     1
+test   merge -> merge  (train)    79
+test   merge -> merge  (val  )    27
+test     own -> fyp    (train)     6
+test     own -> own    (train)    56
+test     own -> own    (val  )    15
+val      fyp -> fyp    (train)     1
+val      fyp -> own    (train)     7
+val    merge -> merge  (train)   152
+val      own -> fyp    (train)     6
+val      own -> own    (train)   126
+
+== Per class (after merge): images containing the class ==
+class                val  flag  clean   test  flag  clean  test flag %
+AH-64                111     4    107     56     2     54          3.6
+An-32                 35     6     29     18     3     15         16.7
+C-130J                42     5     37     21     5     16         23.8
+C-17                 176    20    156     85    13     72         15.3
+C-295                 58     3     55     29     2     27          6.9
+CH-47                142     8    134     74     7     67          9.5
+F-16                 202    10    192    102     5     97          4.9
+H-6                   59     7     52     29     5     24         17.2
+HAL-Chetak            54    13     41     27    10     17         37.0
+HAL-Dhruv             60    22     38     30    15     15         50.0
+HAL-LUH               88     5     83     44     3     41          6.8
+HAL-Prachand          62     2     60     31     1     30          3.2
+HAL-Rudra             56    11     45     28     8     20         28.6
+Il-76-78              93    18     75     47     8     39         17.0
+J-10                  69     2     67     34     4     30         11.8
+J-20                  98     2     96     50     4     46          8.0
+JF-17                 49    12     37     25     6     19         24.0
+JH-7                  45     5     40     22     3     19         13.6
+Mi-24-35              93    20     73     45    10     35         22.2
+Mi-26                 74    31     43     37    23     14         62.2
+Mi-8-17              150    25    125     74    11     63         14.9
+MiG-29                59     7     52     29     6     23         20.7
+Mirage-2000           67     9     58     33     6     27         18.2
+Rafale                93     1     92     46     3     43          6.5
+Tejas                 34     9     25     17     2     15         11.8
+WZ-7                  33    15     18     17     4     13         23.5
+Y-20                  57    10     47     28     9     19         32.1
+Z-10                  29    14     15     14    10      4         71.4
+other_aircraft       613    18    595    321    12    309          3.7
+all images          2576   292   2284   1286   188   1098         14.6
+
+== Checked by eye ==
+fyp_test_000115.jpg: flagged=1 variant=rot180 match=own_train_001134.jpg d_full=0 d_crop=0
+  the train image is the test photo rotated 180 deg and stretched to 640x640 (both have one
+  full-frame C-17 box, so crop hash = whole hash): a genuine copy; dropped.

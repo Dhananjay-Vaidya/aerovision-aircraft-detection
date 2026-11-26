@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this code or the dataset release, please cite it as below."
+title: "AeroVision aircraft dataset: labels, splits and the Aircraft-C benchmark"
+abstract: >-
+  Code and dataset release (labels, splits and metadata; no images) for military-aircraft detection with
+  affiliation labels, the Aircraft-C corruption benchmark and selective (abstaining) affiliation decisions.
+type: dataset
+authors:
+  - family-names: Vaidya
+    given-names: Dhananjay
+  - family-names: Mangla
+    given-names: Monika
+    orcid: "https://orcid.org/0000-0002-1752-7226"
+version: 1.0.0
+date-released: "2026-11-27"
+license:
+  - CC-BY-4.0
+  - MIT
+repository-code: "https://github.com/Dhananjay-Vaidya/aerovision-aircraft-detection"
+keywords:
+  - aircraft detection
+  - object detection
+  - YOLO
+  - robustness
+  - selective prediction
+  - dataset
+references:
+  - type: dataset
+    title: merge_dataset
+    authors:
+      - name: SuperRadarOSINT
+    url: "https://universe.roboflow.com/superradarosint/merge_dataset-9nrmd"
+    license: CC-BY-4.0

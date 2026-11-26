@@ -1,0 +1,9 @@
+# classes with < 50 training images, relabelled other_aircraft
+# class	train_images
+Su-30MKI	15
+Jaguar	19
+J-16	10
+J-11	15
+KJ-500	4
+Mirage-III-V	13
+Saab-2000-Erieye	23

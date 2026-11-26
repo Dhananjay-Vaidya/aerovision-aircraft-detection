@@ -38,4 +38,19 @@ __pycache__/
 results/*limit*
 results/figures_smoke/
 
-# Committed on purpose: code (*.py), kaggle/, paper_assets/, results/, requirements.txt
+# --- photographs: never commit dataset or third-party images ---
+dupes_sample.jpg
+results/leakage_pairs.jpg
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.png
+# generated plots only (paper_assets/fig_aircraft_c uses a CC BY 4.0 merge_dataset image, credited in
+# paper_assets/fig_aircraft_c_credit.txt)
+!paper_assets/*.png
+!results/figures/*.png
+!results/figures_full/*.png
+
+# Committed on purpose: code (*.py), kaggle/, paper_assets/, results/, dataset_release/ (labels and metadata
+# only), requirements.txt

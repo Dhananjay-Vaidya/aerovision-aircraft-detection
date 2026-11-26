@@ -1,0 +1,7 @@
+Example image in fig_aircraft_c (pdf/png):
+  dataset file:      cvs_dataset/images/test/merge_test_000310.jpg
+  source filename:   96289633dffe7618b6532c03e54afe96_jpg.rf.05b1a4beb299a4d2231cbc80f07b1dc6.jpg
+  source dataset:    merge_dataset (SuperRadarOSINT), https://universe.roboflow.com/superradarosint/merge_dataset-9nrmd
+  licence:           CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  modifications:     corrupted with Aircraft-C (corrupt.py, seed 1234) at 9 corruptions x 3 severities
+Suggested caption credit: "Example image from merge_dataset by SuperRadarOSINT (Roboflow Universe), CC BY 4.0; corruptions ours."
