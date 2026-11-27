@@ -7,6 +7,9 @@ $py = ".\venv\Scripts\python.exe"
 $logs = "runs\final_eval_logs"
 New-Item -ItemType Directory -Force $logs | Out-Null
 $status = "$logs\status.txt"
+# Keep Windows from sleeping while this script runs (ES_CONTINUOUS | ES_SYSTEM_REQUIRED); released when it exits.
+Add-Type -Namespace Win32 -Name Power -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+[Win32.Power]::SetThreadExecutionState([uint32]"0x80000001") | Out-Null
 
 function Step($key, $step, [string[]]$cmd) {
   $t0 = Get-Date

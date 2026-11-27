@@ -1,15 +1,15 @@
-\begin{tabular}{lrrr}
+\begin{tabular}{lrrrr}
 \toprule
-Corruption & YOLOv8-s & YOLO26-s & YOLO26-s + plain FT \\
+Corruption & YOLOv8-s & YOLO26-s & YOLO26-s + plain FT & YOLO26-s + degradation FT \\
 \midrule
-Defocus blur & 48.9 & 54.8 & \textbf{56.2} \\
-Motion blur & 33.7 & 39.9 & \textbf{40.5} \\
-Fog & 67.3 & \textbf{75.1} & 74.6 \\
-Low light & 39.7 & \textbf{41.6} & \textbf{41.6} \\
-Gaussian noise & \textbf{22.9} & 21.6 & 20.2 \\
-JPEG & 51.2 & \textbf{56.2} & 55.7 \\
-Downscale & \textbf{33.1} & 32.5 & 30.4 \\
-Contrast$^{\dagger}$ & 60.6 & \textbf{66.7} & 64.9 \\
-Rain$^{\dagger}$ & 44.7 & \textbf{50.5} & \textbf{50.5} \\
+Defocus blur & 48.9 & 54.8 & 56.2 & \textbf{71.9} \\
+Motion blur & 33.7 & 39.9 & 40.5 & \textbf{67.8} \\
+Fog & 67.3 & 75.1 & 74.6 & \textbf{79.3} \\
+Low light & 39.7 & 41.6 & 41.6 & \textbf{73.8} \\
+Gaussian noise & 22.9 & 21.6 & 20.2 & \textbf{68.3} \\
+JPEG & 51.2 & 56.2 & 55.7 & \textbf{75.9} \\
+Downscale & 33.1 & 32.5 & 30.4 & \textbf{73.9} \\
+Contrast$^{\dagger}$ & 60.6 & 66.7 & 64.9 & \textbf{76.2} \\
+Rain$^{\dagger}$ & 44.7 & 50.5 & 50.5 & \textbf{60.9} \\
 \bottomrule
 \end{tabular}
