@@ -75,7 +75,7 @@ def main(argv=None):
     counts = write_clean_splits(data, rows, stats, args.dist)
     update_build_report(data, stats)
 
-    for r in rows:
+    for r in rows:  # label_excluded / gt_overlap / in_clean were set by write_clean_splits
         r["merged_ids"] = sorted({id_map[c] for c in r["class_ids"]})
         r["classes"] = ";".join(names[c] for c in r["merged_ids"])
     flagged = [r for r in rows if r["flagged"]]
@@ -89,7 +89,7 @@ def main(argv=None):
 
     # ---- results/leakage_audit.csv ----
     fields = ["split", "file", "source", "classes", "flagged", "variant", "match_file", "match_split",
-              "d_full", "d_crop", "n_matched", "variants_matched"]
+              "d_full", "d_crop", "n_matched", "variants_matched", "label_excluded", "gt_overlap", "in_clean"]
     with open(res / "leakage_audit.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
@@ -102,7 +102,8 @@ def main(argv=None):
         for split in ("val", "test"):
             sr = [r for r in rows if r["split"] == split and c in r["merged_ids"]]
             fl = sum(r["flagged"] for r in sr)
-            e.update({f"{split}_images": len(sr), f"{split}_flagged": fl, f"{split}_clean": len(sr) - fl,
+            e.update({f"{split}_images": len(sr), f"{split}_flagged": fl,
+                      f"{split}_clean": sum(r["in_clean"] for r in sr),
                       f"{split}_flagged_pct": round(100 * fl / len(sr), 1) if sr else 0.0})
         per[c] = e
     with open(res / "leakage_audit_per_class.csv", "w", newline="", encoding="utf-8") as f:
@@ -117,10 +118,24 @@ def main(argv=None):
          f"Hamming distance {args.dist} of the same reference image. Flagged images are excluded from",
          f"val_clean.txt / test_clean.txt; nothing is moved or deleted.",
          f"Classes are after the merge rule (< 50 training images -> other_aircraft: {', '.join(merged)}).", ""]
-    L.append("== Flagged ==")
+    L.append("== Clean lists ==")
+    L.append("An image is in val_clean.txt / test_clean.txt unless it is (1) flagged by the leakage check,")
+    L.append("(2) excluded for unrepairable labels (label_fixes/fixes.json), or (3) has two GT boxes")
+    L.append("overlapping at IoU >= 0.5. Each column counts images removed by that step and not by an earlier one.")
+    L.append(f"{'split':<6}{'images':>8}{'(1) leak':>10}{'(2) labels':>12}{'(3) overlap':>13}{'clean':>8}")
     for split in ("val", "test"):
         n, fl, kept = counts[split]
-        L.append(f"{split:<5} flagged {fl:>5} / {n:<5} ({100 * fl / n:5.1f}%)   clean {kept}")
+        sr = [r for r in rows if r["split"] == split]
+        lx = sum(1 for r in sr if r["label_excluded"] and not r["flagged"])
+        ov = sum(1 for r in sr if r["gt_overlap"] and not r["flagged"] and not r["label_excluded"])
+        L.append(f"{split:<6}{n:>8}{fl:>10}{lx:>12}{ov:>13}{kept:>8}")
+    L.append("Images with overlapping GT boxes in total (before steps 1-2): " + ", ".join(
+        f"{s} {sum(r['gt_overlap'] for r in rows if r['split'] == s)}" for s in ("val", "test")))
+    L.append("")
+    L.append("== Flagged (leakage) ==")
+    for split in ("val", "test"):
+        n, fl, kept = counts[split]
+        L.append(f"{split:<5} flagged {fl:>5} / {n:<5} ({100 * fl / n:5.1f}%)")
     n_all = sum(c[0] for c in counts.values())
     L.append(f"total flagged {len(flagged)} / {n_all} ({100 * len(flagged) / n_all:.1f}%)")
     L.append("")

@@ -131,6 +131,49 @@ def merged_dataset(data_yaml: str | Path, out_dir: str | Path = MERGED_DIR, resu
     return out_yaml
 
 
+LABEL_SETS = ("fixed", "original")
+ORIGINAL_DIR = ROOT / "data_derived" / "merged_original_labels"
+
+
+def original_labels_view(data_yaml: str | Path, split_set: str = "clean", out_dir: str | Path = ORIGINAL_DIR) -> Path:
+    """Test split scored with the ORIGINAL (uncorrected) exported labels: the merged view, except that every test
+    image in label_fixes/fixes.json gets its original label text back (class merge applied). Same test images as
+    merged_dataset(split_set) (clean or full list), so only the labels differ. Returns a data yaml whose 'test' is
+    that list; 'train' / 'val' point at the merged view (required keys, not used)."""
+    from label_fixes import load_fixes
+    data_yaml = Path(data_yaml).resolve()
+    my = merged_dataset(data_yaml, split_set=split_set)
+    mroot = my.parent
+    id_map, _, _ = class_merge_map(data_yaml)
+    orig = {Path(e["file"]).stem: remap_label_text(e["original"], id_map)
+            for e in load_fixes()["entries"] if e["split"] == "test"}
+    out = Path(out_dir)
+    img_dir, lbl_dir = out / "images" / "test", out / "labels" / "test"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    lbl_dir.mkdir(parents=True, exist_ok=True)
+    test = split_images(my, "test")
+    changed = False
+    for p in test:
+        _link(p.resolve(), img_dir / p.name)
+        text = orig.get(p.stem, (mroot / "labels" / "test" / (p.stem + ".txt")).read_text())
+        dst = lbl_dir / (p.stem + ".txt")
+        if not dst.exists() or dst.read_text() != text:
+            dst.write_text(text)
+            changed = True
+    if changed:
+        for cache in out.glob("labels/*.cache"):
+            cache.unlink()
+    lst = out / f"test_{split_set}.txt"
+    lst.write_text("\n".join((img_dir / p.name).resolve().as_posix() for p in test) + "\n", encoding="utf-8")
+    d = yaml.safe_load(my.read_text(encoding="utf-8"))
+    view = {"path": out.resolve().as_posix(), "train": (mroot / "images" / "train").resolve().as_posix(),
+            "val": (mroot / "images" / "val").resolve().as_posix(), "test": lst.name,
+            "nc": d["nc"], "names": d["names"]}
+    oy = out / f"data_{split_set}.yaml"
+    oy.write_text(yaml.safe_dump(view, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return oy
+
+
 def split_images(data_yaml: str | Path, split: str) -> list[Path]:
     """Images of a split from a data yaml whose entry is a folder or a .txt list."""
     data_yaml = Path(data_yaml)

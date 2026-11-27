@@ -55,3 +55,4 @@ results/abstain_errors.jpg
 
 # Committed on purpose: code (*.py), kaggle/, paper_assets/, results/, dataset_release/ (labels and metadata
 # only), requirements.txt
+label_fixes/*.jpg

@@ -85,6 +85,19 @@ def main():
     shutil.copyfile(DS / "build_report.json", OUT / "build_report.json")
     shutil.copyfile(ROOT / "paper_assets" / "leakage_stats.txt", OUT / "leakage_stats.txt")
 
+    # ---- label fixes (val / test), and the same defect counted in train (not fixed) ----
+    from label_fixes import FIX_FILE, collapsed_groups, load_fixes, parse
+    fixes = load_fixes(FIX_FILE)
+    shutil.copyfile(FIX_FILE, OUT / "label_fixes.json")
+    fix_action = {e["file"]: e["action"] for e in fixes["entries"]}
+    train_collapsed = sum(1 for p in (DS / "labels" / "train").glob("*.txt") if collapsed_groups(parse(p.read_text())[1]))
+    fx = {"relocate": fixes["n_relocate"], "boxes": fixes["boxes_moved"], "drop": fixes["n_drop"],
+          "exclude": fixes["n_exclude"], "localiser": fixes["localiser"], "train_collapsed": train_collapsed}
+    rep = json.loads((DS / "build_report.json").read_text())
+    fx.update({k: rep.get(k, 0) for k in ("leakage_val_flagged", "leakage_test_flagged",
+                                         "label_excluded_val", "label_excluded_test",
+                                         "gt_overlap_val_removed", "gt_overlap_test_removed")})
+
     # ---- sources.csv ----
     ver = {s["tag"]: s["version"] for s in SOURCES}
     proj = {s["tag"]: f"{s['workspace']}/{s['project']}" for s in SOURCES}
@@ -93,13 +106,13 @@ def main():
     with open(OUT / "sources.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["file", "split", "source", "original_filename", "export_path", "source_project",
-                    "source_version", "source_url", "in_clean_split"])
+                    "source_version", "source_url", "in_clean_split", "label_fix"])
         for r in man:
             parts = Path(r["original_path"].replace("\\", "/")).parts
             export_path = "/".join(parts[parts.index(r["source"]) + 1:])  # path inside the Roboflow export
             in_clean = "" if r["split"] == "train" else int(r["file"] in clean[r["split"]])
             w.writerow([r["file"], r["split"], r["source"], parts[-1], export_path, proj[r["source"]],
-                        ver[r["source"]], URL[r["source"]], in_clean])
+                        ver[r["source"]], URL[r["source"]], in_clean, fix_action.get(r["file"], "")])
 
     # ---- Aircraft-C manifest (no local paths) ----
     m = json.loads((ROOT / "data_derived" / "aircraft_c" / "manifest.json").read_text(encoding="utf-8"))
@@ -121,7 +134,7 @@ def main():
     n = {k: len(v[1]) for k, v in lists.items()}
     nbox = {k: sum(stats[k][1].values()) for k in lists}
 
-    write_card(names, aff, merged, train_counts, stats, n, nbox, m)
+    write_card(names, aff, merged, train_counts, stats, n, nbox, m, fx)
     write_license()
     write_rebuild()
 
@@ -133,7 +146,7 @@ def main():
           f"clean val {n['val_clean']} test {n['test_clean']}; no image files")
 
 
-def write_card(names, aff, merged, train_counts, stats, n, nbox, m):
+def write_card(names, aff, merged, train_counts, stats, n, nbox, m, fx):
     order = [i for i in range(len(names)) if names[i] not in merged]
     rows = []
     for i in order:
@@ -166,8 +179,9 @@ of guessing. It accompanies the paper by Dhananjay Vaidya and Monika Mangla (see
 | `class_affiliation.json` | class -> allied / adversary / ambiguous / unknown |
 | `merged_classes.txt` | classes merged into `{OTHER_CLASS}` and their training-image counts |
 | `splits/train.txt`, `val_full.txt`, `test_full.txt` | every image of each split |
-| `splits/val_clean.txt`, `test_clean.txt` | val/test without flipped/rotated near-copies of training images (use these) |
-| `sources.csv` | per image: our file name, split, source, original Roboflow file name and its path in the export, project, version, URL |
+| `splits/val_clean.txt`, `test_clean.txt` | val/test without flipped/rotated near-copies of training images, unrepairable labels or overlapping GT boxes (use these) |
+| `sources.csv` | per image: our file name, split, source, original Roboflow file name and its path in the export, project, version, URL, clean-list membership, label fix |
+| `label_fixes.json` | every val/test label correction: action, reason, original and corrected label text |
 | `aircraft_c_manifest.json` | Aircraft-C corruptions, groups, parameters, severities and seed |
 | `build_report.json` | counts from the build (duplicates removed, caps, leakage audit) |
 | `leakage_stats.txt` | leakage-audit counts by transform, source and class |
@@ -207,13 +221,24 @@ Report results on the **clean** val/test lists. The full lists are kept for comp
    19 exact and 27,563 near duplicates were removed.
 4. **Balancing and split.** Per-class caps, then a 70/20/10 train/val/test split stratified by each image's
    rarest class (seed 42).
-5. **Flip/rotation-invariant leakage audit.** Each val image (against train) and test image (against train + val)
+5. **Val/test label repair** (`label_fixes.json`). Some exported images have every box drawn at the x-position
+   of one aircraft while each box keeps its own height and class (e.g. 12 Y-20 boxes all on the leftmost of a
+   row). In {fx['relocate']} val/test images, {fx['boxes']} such boxes were moved: each was matched one-to-one
+   to a detection of a trained {fx['localiser']} model with the same vertical extent, and takes that detection's
+   x0/x1; class and y0/y1 stay the original annotation. {fx['drop']} images had a duplicate or conflicting box on
+   a single aircraft removed. {fx['exclude']} images whose boxes could not be repaired unambiguously are left out
+   of the clean lists. Every change was checked by eye; train labels are unchanged.
+6. **Flip/rotation-invariant leakage audit.** Each val image (against train) and test image (against train + val)
    is hashed as-is, mirrored horizontally, mirrored vertically and rotated 180 degrees. It is flagged if, for one
-   variant, both the whole-image and the crop pHash are within distance 6 of one image. 292 val and 188 test images
-   were flagged and are left out of the clean lists (see `leakage_stats.txt`).
-6. **Class merge.** Classes with fewer than {MIN_TRAIN_IMAGES} training images are relabelled `{OTHER_CLASS}`
+   variant, both the whole-image and the crop pHash are within distance 6 of one image.
+   {fx['leakage_val_flagged']} val and {fx['leakage_test_flagged']} test images were flagged and are left out of
+   the clean lists (see `leakage_stats.txt`), as are {fx['label_excluded_val']} val and
+   {fx['label_excluded_test']} test images with unrepairable labels (step 5) and a further
+   {fx['gt_overlap_val_removed']} val and {fx['gt_overlap_test_removed']} test images in which two GT boxes overlap
+   at IoU >= 0.5 (duplicate or misplaced boxes, or aircraft too close for reliable box-level scoring).
+7. **Class merge.** Classes with fewer than {MIN_TRAIN_IMAGES} training images are relabelled `{OTHER_CLASS}`
    (same ids, so the class list is stable).
-7. **Aircraft-C.** Every test image is corrupted with {len(m['corruptions'])} corruptions x 3 severities,
+8. **Aircraft-C.** Every test image is corrupted with {len(m['corruptions'])} corruptions x 3 severities,
    deterministic per image (seed {m['seed']}): {corr}. Held-out corruptions are never used for training-time
    augmentation.
 
@@ -225,6 +250,12 @@ Report results on the **clean** val/test lists. The full lists are kept for comp
   long-range surveillance or operational sensor imagery.
 - **Labels.** Boxes and types come from three sources with different annotators. Expect some type confusions
   (e.g. look-alike fighters) and missing boxes on secondary aircraft.
+- **Repaired boxes and train labels.** The horizontal extent of the {fx['boxes']} repaired val/test boxes comes from a
+  detector, which slightly favours detectors similar to it in box-level metrics. The same export defect
+  (several boxes sharing one x-range) is present in {fx['train_collapsed']} train label files, which are left as
+  exported because released models were trained on them.
+- **Leakage audit depends on boxes.** The audit's crop hash uses the largest box; images with a wrong largest box
+  can escape it (repairing the val/test boxes exposed further mirrored copies, now excluded).
 - **Imbalance.** Some types have few test images even before cleaning (e.g. Z-10: 14 full, 4 clean). Per-class
   scores for these are noisy.
 - **Residual leakage.** The audit catches near-identical copies, mirrors and 180-degree rotations only. Crops,
@@ -320,8 +351,10 @@ This release contains labels only. To recreate the image folders with the same f
    ```bash
    python build_dataset.py --download
    ```
-   The last step of the build runs the flip/rotation-invariant leakage check and writes
-   `cvs_dataset/val_clean.txt`, `test_clean.txt` and `data_clean.yaml`.
+   The build then applies the val/test label corrections in `label_fixes/fixes.json` (checked against each
+   image's original file name), runs the flip/rotation-invariant leakage check and writes
+   `cvs_dataset/val_clean.txt`, `test_clean.txt` and `data_clean.yaml` (leaked images and images with
+   unrepairable labels left out).
 3. **Run the leakage audit** (reports, and the same clean lists):
    ```bash
    python audit_leakage.py
