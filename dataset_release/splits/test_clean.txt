@@ -66,7 +66,6 @@ images/test/fyp_test_001008.jpg
 images/test/fyp_test_001009.jpg
 images/test/fyp_test_001037.jpg
 images/test/fyp_test_001042.jpg
-images/test/fyp_test_001086.jpg
 images/test/fyp_test_001104.jpg
 images/test/fyp_test_001132.jpg
 images/test/fyp_test_001135.jpg
@@ -79,7 +78,6 @@ images/test/fyp_test_001220.jpg
 images/test/fyp_test_001256.jpg
 images/test/fyp_test_001280.jpg
 images/test/merge_test_000000.jpg
-images/test/merge_test_000002.jpg
 images/test/merge_test_000005.jpg
 images/test/merge_test_000006.jpg
 images/test/merge_test_000007.jpg
@@ -199,14 +197,12 @@ images/test/merge_test_000286.jpg
 images/test/merge_test_000287.jpg
 images/test/merge_test_000288.jpg
 images/test/merge_test_000289.jpg
-images/test/merge_test_000290.jpg
 images/test/merge_test_000291.jpg
 images/test/merge_test_000292.jpg
 images/test/merge_test_000293.jpg
 images/test/merge_test_000294.jpg
 images/test/merge_test_000295.jpg
 images/test/merge_test_000296.jpg
-images/test/merge_test_000297.jpg
 images/test/merge_test_000298.jpg
 images/test/merge_test_000299.jpg
 images/test/merge_test_000300.jpg
@@ -231,7 +227,6 @@ images/test/merge_test_000319.jpg
 images/test/merge_test_000320.jpg
 images/test/merge_test_000321.jpg
 images/test/merge_test_000322.jpg
-images/test/merge_test_000323.jpg
 images/test/merge_test_000324.jpg
 images/test/merge_test_000325.jpg
 images/test/merge_test_000326.jpg
@@ -288,13 +283,10 @@ images/test/merge_test_000380.jpg
 images/test/merge_test_000381.jpg
 images/test/merge_test_000382.jpg
 images/test/merge_test_000383.jpg
-images/test/merge_test_000384.jpg
 images/test/merge_test_000385.jpg
 images/test/merge_test_000386.jpg
 images/test/merge_test_000387.jpg
-images/test/merge_test_000390.jpg
 images/test/merge_test_000391.jpg
-images/test/merge_test_000392.jpg
 images/test/merge_test_000558.jpg
 images/test/merge_test_000560.jpg
 images/test/merge_test_000561.jpg
@@ -304,9 +296,7 @@ images/test/merge_test_000571.jpg
 images/test/merge_test_000573.jpg
 images/test/merge_test_000574.jpg
 images/test/merge_test_000577.jpg
-images/test/merge_test_000579.jpg
 images/test/merge_test_000580.jpg
-images/test/merge_test_000584.jpg
 images/test/merge_test_000585.jpg
 images/test/merge_test_000587.jpg
 images/test/merge_test_000591.jpg
@@ -342,7 +332,6 @@ images/test/merge_test_000630.jpg
 images/test/merge_test_000634.jpg
 images/test/merge_test_000635.jpg
 images/test/merge_test_000636.jpg
-images/test/merge_test_000637.jpg
 images/test/merge_test_000638.jpg
 images/test/merge_test_000639.jpg
 images/test/merge_test_000640.jpg
@@ -352,7 +341,6 @@ images/test/merge_test_000644.jpg
 images/test/merge_test_000645.jpg
 images/test/merge_test_000646.jpg
 images/test/merge_test_000647.jpg
-images/test/merge_test_000648.jpg
 images/test/merge_test_000650.jpg
 images/test/merge_test_000651.jpg
 images/test/merge_test_000652.jpg
@@ -367,7 +355,6 @@ images/test/merge_test_000660.jpg
 images/test/merge_test_000661.jpg
 images/test/merge_test_000663.jpg
 images/test/merge_test_000664.jpg
-images/test/merge_test_000665.jpg
 images/test/merge_test_000666.jpg
 images/test/merge_test_000668.jpg
 images/test/merge_test_000670.jpg
@@ -413,8 +400,6 @@ images/test/merge_test_000719.jpg
 images/test/merge_test_000720.jpg
 images/test/merge_test_000721.jpg
 images/test/merge_test_000722.jpg
-images/test/merge_test_000723.jpg
-images/test/merge_test_000724.jpg
 images/test/merge_test_000725.jpg
 images/test/merge_test_000726.jpg
 images/test/merge_test_000727.jpg
@@ -459,7 +444,6 @@ images/test/merge_test_000848.jpg
 images/test/merge_test_000855.jpg
 images/test/merge_test_000856.jpg
 images/test/merge_test_000857.jpg
-images/test/merge_test_000860.jpg
 images/test/merge_test_000872.jpg
 images/test/merge_test_000873.jpg
 images/test/merge_test_000877.jpg
@@ -555,8 +539,6 @@ images/test/merge_test_001000.jpg
 images/test/merge_test_001002.jpg
 images/test/merge_test_001003.jpg
 images/test/merge_test_001005.jpg
-images/test/merge_test_001006.jpg
-images/test/merge_test_001007.jpg
 images/test/merge_test_001010.jpg
 images/test/merge_test_001011.jpg
 images/test/merge_test_001013.jpg
@@ -582,7 +564,6 @@ images/test/merge_test_001036.jpg
 images/test/merge_test_001038.jpg
 images/test/merge_test_001044.jpg
 images/test/merge_test_001045.jpg
-images/test/merge_test_001048.jpg
 images/test/merge_test_001049.jpg
 images/test/merge_test_001050.jpg
 images/test/merge_test_001051.jpg
@@ -593,7 +574,6 @@ images/test/merge_test_001055.jpg
 images/test/merge_test_001057.jpg
 images/test/merge_test_001062.jpg
 images/test/merge_test_001066.jpg
-images/test/merge_test_001068.jpg
 images/test/merge_test_001071.jpg
 images/test/merge_test_001074.jpg
 images/test/merge_test_001075.jpg
@@ -613,11 +593,9 @@ images/test/merge_test_001092.jpg
 images/test/merge_test_001093.jpg
 images/test/merge_test_001094.jpg
 images/test/merge_test_001095.jpg
-images/test/merge_test_001097.jpg
 images/test/merge_test_001098.jpg
 images/test/merge_test_001099.jpg
 images/test/merge_test_001100.jpg
-images/test/merge_test_001101.jpg
 images/test/merge_test_001102.jpg
 images/test/merge_test_001103.jpg
 images/test/merge_test_001105.jpg
@@ -626,7 +604,6 @@ images/test/merge_test_001107.jpg
 images/test/merge_test_001108.jpg
 images/test/merge_test_001109.jpg
 images/test/merge_test_001110.jpg
-images/test/merge_test_001111.jpg
 images/test/merge_test_001112.jpg
 images/test/merge_test_001114.jpg
 images/test/merge_test_001115.jpg
@@ -641,7 +618,6 @@ images/test/merge_test_001123.jpg
 images/test/merge_test_001124.jpg
 images/test/merge_test_001125.jpg
 images/test/merge_test_001126.jpg
-images/test/merge_test_001127.jpg
 images/test/merge_test_001128.jpg
 images/test/merge_test_001129.jpg
 images/test/merge_test_001130.jpg
@@ -672,7 +648,6 @@ images/test/merge_test_001158.jpg
 images/test/merge_test_001159.jpg
 images/test/merge_test_001160.jpg
 images/test/merge_test_001161.jpg
-images/test/merge_test_001162.jpg
 images/test/merge_test_001163.jpg
 images/test/merge_test_001165.jpg
 images/test/merge_test_001166.jpg
@@ -684,7 +659,6 @@ images/test/merge_test_001171.jpg
 images/test/merge_test_001172.jpg
 images/test/merge_test_001173.jpg
 images/test/merge_test_001174.jpg
-images/test/merge_test_001175.jpg
 images/test/merge_test_001176.jpg
 images/test/merge_test_001179.jpg
 images/test/merge_test_001180.jpg
@@ -737,7 +711,6 @@ images/test/merge_test_001232.jpg
 images/test/merge_test_001234.jpg
 images/test/merge_test_001235.jpg
 images/test/merge_test_001236.jpg
-images/test/merge_test_001239.jpg
 images/test/merge_test_001240.jpg
 images/test/merge_test_001241.jpg
 images/test/merge_test_001242.jpg

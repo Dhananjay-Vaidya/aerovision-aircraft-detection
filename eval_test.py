@@ -2,13 +2,11 @@
 
   python eval_test.py --weights path/to/best.pt                          # -> results/<model>_clean_test.json
   python eval_test.py --weights path/to/best.pt --split-set full         # -> results/<model>_full_test.json
-  python eval_test.py --weights path/to/best.pt --labels original        # -> results/<model>_clean_test_original_labels.json
 
 Labels are the merged ones (common.merged_dataset); --split-set clean uses cvs_dataset/test_clean.txt (no
-flipped/rotated near-copies of train/val images, unrepairable labels or overlapping GT boxes), full uses every
-test image. --labels original scores the SAME images with the original, uncorrected exported labels (the
-"original" text in label_fixes/fixes.json; common.original_labels_view) instead of the corrected ones (default
---labels fixed). Ultralytics val() on split "test", imgsz 640, batch 16, conf 0.001, FP16, as in
+flipped/rotated near-copies of train/val images, no images with two GT boxes at IoU >= 0.5 or sharing one
+x-range; see build_dataset.write_clean_splits), full uses every test image. Labels are the original exports (no
+corrections). Ultralytics val() on split "test", imgsz 640, batch 16, conf 0.001, FP16, as in
 kaggle/finetune_degrade.py.
 """
 from __future__ import annotations
@@ -19,8 +17,8 @@ from pathlib import Path
 
 import yaml
 
-from common import LABEL_SETS, MIN_TRAIN_IMAGES, OTHER_CLASS, ROOT, SPLIT_SETS, class_merge_map, default_workers, \
-    load_names, merged_dataset, original_labels_view, split_images
+from common import MIN_TRAIN_IMAGES, OTHER_CLASS, ROOT, SPLIT_SETS, class_merge_map, default_workers, load_names, \
+    merged_dataset, split_images
 
 
 def main(argv=None):
@@ -29,8 +27,6 @@ def main(argv=None):
     ap.add_argument("--name", default=None, help="output name (default: run folder, e.g. yolo26s)")
     ap.add_argument("--data", default=str(ROOT / "cvs_dataset" / "data.yaml"))
     ap.add_argument("--split-set", choices=SPLIT_SETS, default="clean")
-    ap.add_argument("--labels", choices=LABEL_SETS, default="fixed",
-                    help="fixed: corrected labels (default); original: the uncorrected exported labels")
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--workers", type=int, default=default_workers())
@@ -44,9 +40,7 @@ def main(argv=None):
     if not weights.exists():
         raise SystemExit(f"weights not found: {weights}")
     args.name = args.name or (weights.parent.parent.name if weights.parent.name == "weights" else weights.stem)
-    data_yaml = (merged_dataset(args.data, split_set=args.split_set) if args.labels == "fixed"
-                 else original_labels_view(args.data, split_set=args.split_set))
-    sfx = "" if args.labels == "fixed" else "_original_labels"
+    data_yaml = merged_dataset(args.data, split_set=args.split_set)
     names = load_names(data_yaml)
     _, merged, _ = class_merge_map(args.data)
     n_test = len(split_images(data_yaml, "test"))
@@ -54,7 +48,7 @@ def main(argv=None):
     n_params, gflops = get_num_params(model.model), get_flops(model.model, args.imgsz)
     m = model.val(data=str(data_yaml), split="test", imgsz=args.imgsz, batch=args.batch, conf=0.001, half=True,
                   plots=False, verbose=False, workers=args.workers, project=str(ROOT / "runs" / "eval"),
-                  name=f"{args.name}_{args.split_set}_test{sfx}", exist_ok=True)
+                  name=f"{args.name}_{args.split_set}_test", exist_ok=True)
     ckpt_args = {}
     run_args = weights.parent.parent / "args.yaml"  # training args saved next to weights/
     if run_args.exists():
@@ -68,13 +62,13 @@ def main(argv=None):
         "merged_classes": merged,
         # extra fields (not in the Kaggle file)
         "params": int(n_params), "params_M": round(n_params / 1e6, 3), "gflops": round(float(gflops), 2),
-        "split_set": args.split_set, "labels": args.labels, "n_test_images": n_test, "weights": str(weights),
+        "split_set": args.split_set, "n_test_images": n_test, "weights": str(weights),
         "merged_into": OTHER_CLASS, "min_train_images": MIN_TRAIN_IMAGES,
     }
-    out = Path(args.out) if args.out else ROOT / "results" / f"{args.name}_{args.split_set}_test{sfx}.json"
+    out = Path(args.out) if args.out else ROOT / "results" / f"{args.name}_{args.split_set}_test.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(res, indent=2), encoding="utf-8")
-    print(f"[eval_test.py] {args.split_set} ({args.labels} labels): {n_test} test images  mAP50={res['mAP50']:.4f} "
+    print(f"[eval_test.py] {args.split_set}: {n_test} test images  mAP50={res['mAP50']:.4f} "
           f"mAP50-95={res['mAP50_95']:.4f}  P={res['precision']:.4f} R={res['recall']:.4f}  -> {out}")
 
 

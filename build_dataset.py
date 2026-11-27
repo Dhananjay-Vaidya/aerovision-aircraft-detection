@@ -658,64 +658,95 @@ def leakage_check(out_dir: Path, max_dist: int = 6, cache_path: Path = None, log
     return rows
 
 
-GT_OVERLAP_IOU = 0.5
+# ---- label-only geometry rules for the clean lists (no model predictions, no manual decisions) ----
+GT_OVERLAP_IOU = 0.5     # rule (i)
+SHARED_X_TOL = 0.002     # rule (ii), in normalised image width
 
 
-def gt_overlap(out_dir: Path, split: str, file: str, thr: float = GT_OVERLAP_IOU) -> bool:
-    """True if two GT boxes of the image overlap at IoU >= thr (duplicate / misplaced annotations, or aircraft so
-    close that box-level scores are unreliable)."""
+def gt_boxes_xyxy(out_dir: Path, split: str, file: str):
+    """GT boxes of an image as normalised (x0, y0, x1, y1), from its YOLO label file."""
     import numpy as np
     bs = []
     for _, coords in _split_boxes(Path(out_dir), split, Path(file)):
         xc, yc, w, h = map(float, coords.split())
         bs.append((xc - w / 2, yc - h / 2, xc + w / 2, yc + h / 2))
-    if len(bs) < 2:
+    return np.array(bs).reshape(-1, 4)
+
+
+def gt_overlap(boxes, thr: float = GT_OVERLAP_IOU) -> bool:
+    """Rule (i): some two GT boxes of the image have IoU >= thr."""
+    import numpy as np
+    if len(boxes) < 2:
         return False
-    b = np.array(bs)
-    lt = np.maximum(b[:, None, :2], b[None, :, :2])
-    rb = np.minimum(b[:, None, 2:], b[None, :, 2:])
+    lt = np.maximum(boxes[:, None, :2], boxes[None, :, :2])
+    rb = np.minimum(boxes[:, None, 2:], boxes[None, :, 2:])
     inter = np.prod(np.clip(rb - lt, 0, None), axis=2)
-    area = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
+    area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
     iou = inter / (area[:, None] + area[None, :] - inter + 1e-12)
     np.fill_diagonal(iou, 0)
     return bool((iou >= thr).any())
 
 
+def shared_x_groups(boxes, tol: float = SHARED_X_TOL):
+    """Rule (ii), "stacked boxes on one x-range": groups (lists of box indices, size >= 2) of GT boxes whose left
+    edges x0 AND right edges x1 both agree within `tol` (normalised image width) with the first box of the group.
+    Boxes are taken in label-file order; each box belongs to at most one group. This is the signature of an export
+    defect in which several boxes of an image were given the horizontal extent of one aircraft (each keeping its
+    own y0 / y1); it also catches exact duplicate boxes and genuinely aligned aircraft (in-trail columns)."""
+    groups, seen = [], set()
+    for i in range(len(boxes)):
+        if i in seen:
+            continue
+        g = [j for j in range(len(boxes)) if j not in seen
+             and abs(boxes[j, 0] - boxes[i, 0]) <= tol and abs(boxes[j, 2] - boxes[i, 2]) <= tol]
+        if len(g) >= 2:
+            groups.append(g)
+        seen.update(g)
+    return groups
+
+
+CLEAN_RULES = ("leak", "gt_overlap", "shared_x")
+
+
 def write_clean_splits(out_dir: Path, rows, stats=None, max_dist: int = 6):
     """Write <out>/val_clean.txt, <out>/test_clean.txt and <out>/data_clean.yaml (train as in data.yaml; val/test ->
-    the lists). An image is left out of a clean list if it is (1) flagged by the leakage check, (2) excluded in
-    label_fixes/fixes.json (labels not repairable), or (3) has two GT boxes overlapping at IoU >= 0.5.
-    Sets r["label_excluded"], r["gt_overlap"], r["in_clean"] on every row and adds the counts to `stats`."""
-    from label_fixes import excluded as label_excluded
+    the lists). An image is left out of a clean list if
+      (leak)       it is flagged by the flip/rotation leakage check, or
+      (gt_overlap) two of its GT boxes overlap at IoU >= 0.5 (rule i), or
+      (shared_x)   two of its GT boxes share one x-range: |dx0| <= 0.002 and |dx1| <= 0.002 (rule ii).
+    Only the labels and the image hashes are used. Sets r["gt_overlap"], r["shared_x"], r["in_clean"] and
+    r["removed_by"] (first rule that applies, in the order above) on every row; adds counts to `stats`."""
     out_dir = Path(out_dir).resolve()
     d = yaml.safe_load((out_dir / "data.yaml").read_text())
-    bad_labels = label_excluded()  # label_fixes/fixes.json: labels that could not be repaired
     for r in rows:
-        r["label_excluded"] = int(r["file"] in bad_labels)
-        r["gt_overlap"] = int(gt_overlap(out_dir, r["split"], r["file"]))
-        r["in_clean"] = int(not r["flagged"] and not r["label_excluded"] and not r["gt_overlap"])
-    counts, n_bad, n_ovl, n_ovl_all = {}, {}, {}, {}
+        b = gt_boxes_xyxy(out_dir, r["split"], r["file"])
+        r["gt_overlap"] = int(gt_overlap(b))
+        r["shared_x"] = int(bool(shared_x_groups(b)))
+        r["removed_by"] = next((k for k, v in (("leak", r["flagged"]), ("gt_overlap", r["gt_overlap"]),
+                                               ("shared_x", r["shared_x"])) if v), "")
+        r["in_clean"] = int(not r["removed_by"])
+    counts = {}
     for split in ("val", "test"):
         sr = [r for r in rows if r["split"] == split]
         keep = [(out_dir / "images" / split / r["file"]).as_posix() for r in sr if r["in_clean"]]
         (out_dir / f"{split}_clean.txt").write_text("\n".join(keep) + "\n", encoding="utf-8")
-        n_bad[split] = sum(1 for r in sr if r["label_excluded"] and not r["flagged"])
-        # removed by the overlap filter alone (not already out for leakage or unrepairable labels)
-        n_ovl[split] = sum(1 for r in sr if r["gt_overlap"] and not r["flagged"] and not r["label_excluded"])
-        n_ovl_all[split] = sum(r["gt_overlap"] for r in sr)
         counts[split] = (len(sr), sum(1 for r in sr if r["flagged"]), len(keep))
+        if stats is not None:
+            for k in CLEAN_RULES:  # removed by this rule and not by an earlier one
+                stats[f"clean_removed_{k}_{split}"] = sum(1 for r in sr if r["removed_by"] == k)
+            stats[f"gt_overlap_{split}_images"] = sum(r["gt_overlap"] for r in sr)  # regardless of other rules
+            stats[f"shared_x_{split}_images"] = sum(r["shared_x"] for r in sr)
     clean = {"path": out_dir.as_posix(), "train": d["train"], "val": "val_clean.txt", "test": "test_clean.txt",
              "nc": d["nc"], "names": d["names"]}
     with open(out_dir / "data_clean.yaml", "w") as f:
         yaml.safe_dump(clean, f, sort_keys=False)
     if stats is not None:
         stats["leakage_max_dist"] = max_dist
+        stats["clean_rule_gt_overlap_iou"] = GT_OVERLAP_IOU
+        stats["clean_rule_shared_x_tol"] = SHARED_X_TOL
         for split, (n, fl, kept) in counts.items():
             stats[f"leakage_{split}_images"] = n
             stats[f"leakage_{split}_flagged"] = fl
-            stats[f"label_excluded_{split}"] = n_bad[split]  # unflagged images left out for unrepairable labels
-            stats[f"gt_overlap_{split}_images"] = n_ovl_all[split]  # images with two GT boxes at IoU >= 0.5
-            stats[f"gt_overlap_{split}_removed"] = n_ovl[split]     # ... left out by this filter alone
             stats[f"leakage_{split}_clean"] = kept
         for v in LEAK_VARIANTS:
             stats[f"leakage_flagged_variant_{v}"] = sum(1 for r in rows if r["flagged"] and r["variant"] == v)
@@ -771,17 +802,15 @@ def main():
     print(f"[write] {args.out_dir}/  train {len(splits['train'])}  val {len(splits['val'])}  "
           f"test {len(splits['test'])}")
 
-    from label_fixes import apply as apply_label_fixes
-    fx = apply_label_fixes(args.out_dir)  # val / test label corrections (label_fixes/fixes.json)
-    print(f"[label_fixes] {fx}")
-    leak_stats = Counter({f"label_fixes_{k}": v for k, v in fx.items()})
+    leak_stats = Counter()
     rows = leakage_check(args.out_dir, args.leak_dist, args.raw_dir / "hash_cache.tsv")
     counts = write_clean_splits(args.out_dir, rows, leak_stats, args.leak_dist)
     update_build_report(args.out_dir, leak_stats)
     for split, (n, fl, kept) in counts.items():
-        print(f"[leakage] {split}: {fl}/{n} flagged as flipped/rotated copies, "
-              f"{leak_stats[f'label_excluded_{split}']} unrepairable labels, "
-              f"{leak_stats[f'gt_overlap_{split}_removed']} with overlapping GT boxes -> {kept} in {split}_clean.txt")
+        print(f"[clean] {split}: {n} images; removed {leak_stats[f'clean_removed_leak_{split}']} leaked, "
+              f"{leak_stats[f'clean_removed_gt_overlap_{split}']} GT boxes at IoU >= 0.5, "
+              f"{leak_stats[f'clean_removed_shared_x_{split}']} GT boxes sharing one x-range -> {kept} in "
+              f"{split}_clean.txt")
     print(f"[leakage] wrote {args.out_dir}/val_clean.txt, test_clean.txt, data_clean.yaml "
           f"(python audit_leakage.py for the full report)")
     thin = [c for c in TARGET_CLASSES if c != OTHER and sum(per_class[c].values()) < 300]

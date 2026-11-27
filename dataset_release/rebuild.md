@@ -19,8 +19,8 @@ This release contains labels only. To recreate the image folders with the same f
    ```bash
    python build_dataset.py --download
    ```
-   The last step of the build runs the flip/rotation-invariant leakage check and writes
-   `cvs_dataset/val_clean.txt`, `test_clean.txt` and `data_clean.yaml`.
+   The build then runs the flip/rotation-invariant leakage check and the label-geometry rules and writes
+   `cvs_dataset/val_clean.txt`, `test_clean.txt` and `data_clean.yaml`. No label is corrected.
 3. **Run the leakage audit** (reports, and the same clean lists):
    ```bash
    python audit_leakage.py

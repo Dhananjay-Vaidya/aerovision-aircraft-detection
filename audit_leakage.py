@@ -75,7 +75,7 @@ def main(argv=None):
     counts = write_clean_splits(data, rows, stats, args.dist)
     update_build_report(data, stats)
 
-    for r in rows:  # label_excluded / gt_overlap / in_clean were set by write_clean_splits
+    for r in rows:  # gt_overlap / shared_x / removed_by / in_clean were set by write_clean_splits
         r["merged_ids"] = sorted({id_map[c] for c in r["class_ids"]})
         r["classes"] = ";".join(names[c] for c in r["merged_ids"])
     flagged = [r for r in rows if r["flagged"]]
@@ -89,7 +89,7 @@ def main(argv=None):
 
     # ---- results/leakage_audit.csv ----
     fields = ["split", "file", "source", "classes", "flagged", "variant", "match_file", "match_split",
-              "d_full", "d_crop", "n_matched", "variants_matched", "label_excluded", "gt_overlap", "in_clean"]
+              "d_full", "d_crop", "n_matched", "variants_matched", "gt_overlap", "shared_x", "removed_by", "in_clean"]
     with open(res / "leakage_audit.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
@@ -119,18 +119,20 @@ def main(argv=None):
          f"val_clean.txt / test_clean.txt; nothing is moved or deleted.",
          f"Classes are after the merge rule (< 50 training images -> other_aircraft: {', '.join(merged)}).", ""]
     L.append("== Clean lists ==")
-    L.append("An image is in val_clean.txt / test_clean.txt unless it is (1) flagged by the leakage check,")
-    L.append("(2) excluded for unrepairable labels (label_fixes/fixes.json), or (3) has two GT boxes")
-    L.append("overlapping at IoU >= 0.5. Each column counts images removed by that step and not by an earlier one.")
-    L.append(f"{'split':<6}{'images':>8}{'(1) leak':>10}{'(2) labels':>12}{'(3) overlap':>13}{'clean':>8}")
+    L.append("Labels are the original exported labels (no corrections applied). An image is in val_clean.txt /")
+    L.append("test_clean.txt unless (1) the leakage check flags it, (2) two of its GT boxes overlap at IoU >= 0.5,")
+    L.append("or (3) two of its GT boxes share one x-range (|dx0| <= 0.002 and |dx1| <= 0.002, normalised width;")
+    L.append("build_dataset.shared_x_groups). Only labels and image hashes are used; no model predictions and no")
+    L.append("manual decisions. Each column counts images removed by that rule and not by an earlier one.")
+    L.append(f"{'split':<6}{'images':>8}{'(1) leak':>10}{'(2) IoU>=0.5':>14}{'(3) shared x':>14}{'clean':>8}")
     for split in ("val", "test"):
         n, fl, kept = counts[split]
         sr = [r for r in rows if r["split"] == split]
-        lx = sum(1 for r in sr if r["label_excluded"] and not r["flagged"])
-        ov = sum(1 for r in sr if r["gt_overlap"] and not r["flagged"] and not r["label_excluded"])
-        L.append(f"{split:<6}{n:>8}{fl:>10}{lx:>12}{ov:>13}{kept:>8}")
-    L.append("Images with overlapping GT boxes in total (before steps 1-2): " + ", ".join(
-        f"{s} {sum(r['gt_overlap'] for r in rows if r['split'] == s)}" for s in ("val", "test")))
+        k = {rule: sum(1 for r in sr if r["removed_by"] == rule) for rule in ("leak", "gt_overlap", "shared_x")}
+        L.append(f"{split:<6}{n:>8}{k['leak']:>10}{k['gt_overlap']:>14}{k['shared_x']:>14}{kept:>8}")
+    L.append("Images meeting rule 2 / rule 3 regardless of the other rules: " + "; ".join(
+        f"{s} {sum(r['gt_overlap'] for r in rows if r['split'] == s)} / "
+        f"{sum(r['shared_x'] for r in rows if r['split'] == s)}" for s in ("val", "test")))
     L.append("")
     L.append("== Flagged (leakage) ==")
     for split in ("val", "test"):

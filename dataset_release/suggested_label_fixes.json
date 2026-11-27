@@ -1,4 +1,20 @@
 {
+ "status": "UNVERIFIED SUGGESTIONS - NOT APPLIED. The labels in this release are the original exported labels. These suggestions were not applied to them and are not used in the paper's evaluation.",
+ "purpose": "Errata for users of the source exports: val/test images whose exported boxes look wrong, with a suggested correction. Check each one yourself before using it.",
+ "coordinates_note": "For action 'relocate', x0/x1 of the boxes were taken from the output of a trained yolo26s detector (conf >= 0.05, matched on vertical extent); only y0/y1 and the class are the original human annotation. These coordinates are detector output, not human annotation.",
+ "actions": {
+  "relocate": "suggested new x0/x1 for boxes that share one x-range (see coordinates_note)",
+  "drop_duplicate": "suggested removal of a second box on the same aircraft",
+  "drop_conflict": "suggested removal of a box with a conflicting class on the same aircraft",
+  "exclude": "no repair suggested; the image's labels look wrong"
+ },
+ "how_our_evaluation_handles_these_images": "Not via this file. The clean val/test lists leave out images by label-only geometry rules (two GT boxes at IoU >= 0.5, or two GT boxes sharing one x-range) plus the leakage check; see leakage_stats.txt and build_report.json.",
+ "fields": {
+  "original": "label text as exported (class ids before the class merge)",
+  "fixed": "suggested label text (null for 'exclude')",
+  "found_by": "how the image was found",
+  "changes": "per-box before/after of the suggestion"
+ },
  "localiser": "yolo26s",
  "localiser_conf": 0.05,
  "y_tol": 0.015,
@@ -58,7 +74,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -118,7 +135,8 @@
       "change": "dropped"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -163,7 +181,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -243,7 +262,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -302,7 +322,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -429,7 +450,8 @@
       "change": "x adjusted < 0.01 (box was on its aircraft; x0/x1 now from the localiser)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -585,7 +607,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -638,7 +661,8 @@
       "change": "dropped"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -697,7 +721,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -756,7 +781,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -936,7 +962,8 @@
       "change": "x adjusted < 0.01 (box was on its aircraft; x0/x1 now from the localiser)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1155,7 +1182,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1214,7 +1242,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1277,7 +1306,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1352,7 +1382,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1445,7 +1476,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1516,7 +1548,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1609,7 +1642,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1685,7 +1719,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1780,7 +1815,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1839,7 +1875,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1898,7 +1935,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -1985,7 +2023,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2058,7 +2097,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2111,7 +2151,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2170,7 +2211,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2250,7 +2292,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2309,7 +2352,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2389,7 +2433,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2452,7 +2497,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2523,7 +2569,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2582,7 +2629,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2645,7 +2693,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2720,7 +2769,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2779,7 +2829,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -2842,7 +2893,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3052,7 +3104,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3218,7 +3271,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3307,7 +3361,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3434,7 +3489,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3479,7 +3535,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3538,7 +3595,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3593,7 +3651,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3721,7 +3780,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -3791,7 +3851,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -4081,7 +4142,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -4140,7 +4202,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -4433,7 +4496,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -4492,7 +4556,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -4861,7 +4926,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5142,7 +5208,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5231,7 +5298,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5358,7 +5426,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5403,7 +5472,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5479,7 +5549,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5538,7 +5609,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5614,7 +5686,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "val",
@@ -5679,7 +5752,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -5732,7 +5806,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -5787,7 +5862,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -5863,7 +5939,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -5967,7 +6044,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6077,7 +6155,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6272,7 +6351,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6331,7 +6411,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6424,7 +6505,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6600,7 +6682,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6683,7 +6766,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6728,7 +6812,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6787,7 +6872,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6874,7 +6960,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -6957,7 +7044,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7012,7 +7100,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7071,7 +7160,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7124,7 +7214,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7183,7 +7274,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7242,7 +7334,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7434,7 +7527,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7603,7 +7697,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7662,7 +7757,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7725,7 +7821,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7806,7 +7903,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7882,7 +7980,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -7954,7 +8053,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -8101,7 +8201,8 @@
       "change": "none"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -8154,7 +8255,8 @@
       "change": "unchanged"
      }
     ]
-   }
+   },
+   "applied": false
   },
   {
    "split": "test",
@@ -8247,7 +8349,8 @@
       "change": "moved to another aircraft (x0/x1 from localiser; y0/y1 and class kept)"
      }
     ]
-   }
+   },
+   "applied": false
   }
  ],
  "discovery": "1) diagnose_abstain.py (YOLOv8-s and YOLO26-s, clean val/test, ORIGINAL labels, detections with conf >= 0.9 that abstain.py counts as errors) put merge_val_002082 (12 Y-20 boxes on one aircraft) at the top of results/abstain_errors.jpg. 2) All val/test images were then scanned for two original GT boxes overlapping at IoU >= 0.5 and reviewed by eye. 3) The review showed the export defect (boxes sharing one x-range), so every val/test image with >= 2 original GT boxes sharing x0/x1 within 0.002 was proposed for repair (collapsed-x rule), and every proposal was reviewed by eye. Manual decisions are listed in label_fixes.MANUAL.",

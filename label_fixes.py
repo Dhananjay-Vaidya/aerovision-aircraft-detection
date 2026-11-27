@@ -1,33 +1,25 @@
-"""Corrections to val / test labels inherited from the Roboflow exports (mostly merge_dataset).
+"""SUGGESTED (unverified, NOT applied) corrections to val / test labels from the Roboflow exports - errata only.
 
-  python label_fixes.py propose [--weights runs/.../best.pt]   # writes label_fixes/fixes.json (+ local review sheet)
-  python label_fixes.py apply                                   # applies it to cvs_dataset/ (idempotent)
-  python label_fixes.py document    # provenance + before/after into fixes.json; label_fixes/review_*.jpg (local)
+  python label_fixes.py propose [--weights runs/.../best.pt]   # writes the suggestions (+ local review sheet)
+  python label_fixes.py document    # provenance + before/after per entry; label_fixes/review_*.jpg (local)
 
-The original labels stay available: every entry of fixes.json keeps the exported label text ("original"), and
-eval_test.py --labels original scores test with it (common.original_labels_view).
+The suggestions live in dataset_release/suggested_label_fixes.json. They are NOT applied to cvs_dataset/ or to the
+released labels and are NOT used in our evaluation: the labels are the original exports, and the clean val / test
+lists leave out the affected images with label-only geometry rules instead (build_dataset.write_clean_splits).
 
-What is wrong. In a number of multi-aircraft images every box of the image was exported with the SAME x0 / x1 (those
-of one aircraft) while each box kept its own y0 / y1 and class: e.g. merge_val_002082 has 12 Y-20 boxes all drawn on
-the leftmost of 12 aircraft. Such a "collapsed group" (>= 2 GT boxes with x0 and x1 equal within 0.002) is repaired
-by matching every box one-to-one (Hungarian, cost = max(|dy0|, |dy1|) <= --y-tol) to a detection of a localiser
-model (any class, conf >= 0.05, class-agnostic NMS at IoU 0.6) and taking the detection's x0 / x1. The class and
-y0 / y1 stay the human annotation. If a box finds no match, or two boxes of different classes could swap
-detections at almost no cost, the image is EXCLUDED from the clean val / test lists instead (never guessed).
-Box x-extents of repaired boxes therefore come from the localiser (YOLO26-s by default): see the README caveat.
+What looks wrong. In a number of multi-aircraft images every box of the image was exported with the SAME x0 / x1
+(those of one aircraft) while each box kept its own y0 / y1 and class: e.g. merge_val_002082 has 12 Y-20 boxes all
+drawn on the leftmost of 12 aircraft. For such a "collapsed group" (>= 2 GT boxes with x0 and x1 equal within 0.002)
+a repair is SUGGESTED by matching every box one-to-one (Hungarian, cost = max(|dy0|, |dy1|) <= --y-tol) to a
+detection of a localiser model (any class, conf >= 0.05, class-agnostic NMS at IoU 0.6) and taking the detection's
+x0 / x1; class and y0 / y1 stay the human annotation. So the suggested x-extents are DETECTOR OUTPUT (YOLO26-s), not
+human annotation. If a box finds no match, or the assignment is ambiguous, the suggestion is "exclude" instead.
 
-Besides the automatic repair, MANUAL decisions from a visual review of every val / test image with stacked GT
-boxes (IoU >= 0.5 between two GT boxes):
-  * duplicate box on a single aircraft -> dropped (same class)
-  * merge_val_001581: Mi-26 also boxed as Il-76-78 -> Il-76-78 box dropped
-  * merge_val_001579: map / photo collage, boxes on map markers -> excluded
-Stacked boxes on genuinely overlapping aircraft (close formations, lines of parked aircraft) are left alone.
-
-Train labels are not changed (the trained weights were trained on them).
-
-label_fixes/fixes.json holds, per image, split / file / original export file name / action / reason and the
-original and fixed label text, so build_dataset.py re-applies it after a rebuild (checked against the original
-file name) and write_clean_splits() leaves the excluded images out of {val,test}_clean.txt.
+Besides that, MANUAL suggestions from a visual review of every val / test image with two GT boxes at IoU >= 0.5:
+  * duplicate box on a single aircraft -> drop (same class)
+  * merge_val_001581: Mi-26 also boxed as Il-76-78 -> drop the Il-76-78 box
+  * merge_val_001579: map / photo collage, boxes on map markers -> exclude
+Train labels were not examined in this way.
 """
 from __future__ import annotations
 
@@ -39,8 +31,8 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent
-FIX_DIR = ROOT / "label_fixes"
-FIX_FILE = FIX_DIR / "fixes.json"
+FIX_DIR = ROOT / "label_fixes"  # local review images only (gitignored)
+FIX_FILE = ROOT / "dataset_release" / "suggested_label_fixes.json"
 
 # manual decisions (visual review): file -> (action, label line indices to drop, reason)
 MANUAL = {
@@ -247,37 +239,6 @@ def load_fixes(path: Path = FIX_FILE):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"entries": []}
 
 
-def excluded(path: Path = FIX_FILE) -> set[str]:
-    """Image file names excluded from the clean val / test lists."""
-    return {e["file"] for e in load_fixes(path)["entries"] if e["action"] == "exclude"}
-
-
-def apply(data_dir: Path, path: Path = FIX_FILE, log=print) -> dict:
-    """Write the fixed labels into data_dir (idempotent; checked against the original export file name)."""
-    data_dir = Path(data_dir)
-    man = manifest(data_dir)
-    n = {"applied": 0, "already": 0, "excluded": 0, "mismatch": 0}
-    for e in load_fixes(path)["entries"]:
-        if e["original_filename"] and man.get(e["file"]) != e["original_filename"]:
-            log(f"[label_fixes] {e['file']}: original file name differs (dataset rebuilt differently?), skipped")
-            n["mismatch"] += 1
-            continue
-        if e["action"] == "exclude":
-            n["excluded"] += 1
-            continue
-        lbl = data_dir / "labels" / e["split"] / (Path(e["file"]).stem + ".txt")
-        cur = lbl.read_text()
-        if cur == e["fixed"]:
-            n["already"] += 1
-        elif cur == e["original"]:
-            lbl.write_text(e["fixed"])
-            n["applied"] += 1
-        else:
-            log(f"[label_fixes] {e['file']}: label is neither the original nor the fix, skipped")
-            n["mismatch"] += 1
-    return n
-
-
 DISCOVERY = (
     "1) diagnose_abstain.py (YOLOv8-s and YOLO26-s, clean val/test, ORIGINAL labels, detections with conf >= 0.9 "
     "that abstain.py counts as errors) put merge_val_002082 (12 Y-20 boxes on one aircraft) at the top of "
@@ -347,7 +308,7 @@ def found_by(e, err_rows):
 
 
 def document(errors_csv: Path, data_dir: Path, sheet_dir: Path, path: Path = FIX_FILE):
-    """Add provenance and before/after per entry to fixes.json (label text untouched) and write one local review
+    """Add provenance and before/after per entry to the suggestions file (label text untouched) and write one local review
     image per entry: original GT red, fixed GT green."""
     names = load_names_safe(data_dir)
     fx = load_fixes(path)
@@ -400,26 +361,6 @@ def review_images(entries, data: Path, out: Path, names, width=1000):
     return len(entries)
 
 
-def sync_aircraft_c(data_dir: Path, corrupt_root: Path, path: Path = FIX_FILE) -> int:
-    """Copy the (merged) fixed test labels into every Aircraft-C condition (corruptions do not move boxes)."""
-    from common import merged_dataset, merged_labels_dir
-    if not corrupt_root.is_dir():
-        return 0
-    merged = merged_dataset(Path(data_dir) / "data.yaml", split_set="full")
-    src = merged_labels_dir(merged, "test")
-    n = 0
-    for e in load_fixes(path)["entries"]:
-        if e["split"] != "test" or e["action"] == "exclude":
-            continue
-        stem = Path(e["file"]).stem
-        text = (src / f"{stem}.txt").read_text()
-        for lbl in corrupt_root.glob(f"*/*/labels/{stem}.txt"):
-            if lbl.read_text() != text:
-                lbl.write_text(text)
-                n += 1
-    return n
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -429,12 +370,8 @@ def main(argv=None):
     p.add_argument("--conf", type=float, default=0.05)
     p.add_argument("--y-tol", type=float, default=0.015)
     p.add_argument("--sheet", default=str(ROOT / "results" / "label_fixes_review.jpg"))
-    p.add_argument("--force", action="store_true", help="overwrite an existing label_fixes/fixes.json")
-    a = sub.add_parser("apply")
-    a.add_argument("--data-dir", default=str(ROOT / "cvs_dataset"))
-    a.add_argument("--corrupt-root", default=str(ROOT / "data_derived" / "aircraft_c"),
-                   help="Aircraft-C labels of fixed test images are updated too")
-    dc = sub.add_parser("document", help="add provenance + before/after to fixes.json; local review images")
+    p.add_argument("--force", action="store_true", help="overwrite an existing suggestions file")
+    dc = sub.add_parser("document", help="add provenance + before/after; local review images")
     dc.add_argument("--data-dir", default=str(ROOT / "cvs_dataset"))
     dc.add_argument("--errors-csv", default=str(ROOT / "results" / "abstain_errors.csv"),
                     help="diagnose_abstain.py output on the ORIGINAL labels")
@@ -449,11 +386,6 @@ def main(argv=None):
         if args.weights is None:
             args.weights = json.loads((ROOT / "results" / "yolo26s_abstain.json").read_text())["weights"]
         propose(args)
-    else:
-        print(f"[label_fixes] {apply(Path(args.data_dir))}")
-        n = sync_aircraft_c(Path(args.data_dir), Path(args.corrupt_root))
-        print(f"[label_fixes] Aircraft-C: {n} label files updated "
-              f"(run python audit_leakage.py next to rewrite the clean lists)")
 
 
 if __name__ == "__main__":

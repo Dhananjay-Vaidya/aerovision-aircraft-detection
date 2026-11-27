@@ -22,8 +22,9 @@ of guessing. It accompanies the paper by Dhananjay Vaidya and Monika Mangla (see
 | `class_affiliation.json` | class -> allied / adversary / ambiguous / unknown |
 | `merged_classes.txt` | classes merged into `other_aircraft` and their training-image counts |
 | `splits/train.txt`, `val_full.txt`, `test_full.txt` | every image of each split |
-| `splits/val_clean.txt`, `test_clean.txt` | val/test without flipped/rotated near-copies of training images (use these) |
-| `sources.csv` | per image: our file name, split, source, original Roboflow file name and its path in the export, project, version, URL |
+| `splits/val_clean.txt`, `test_clean.txt` | val/test without flipped/rotated near-copies of training images and without images whose GT boxes overlap (IoU >= 0.5) or share one x-range (use these) |
+| `sources.csv` | per image: our file name, split, source, original Roboflow file name and its path in the export, project, version, URL, clean-list membership, suggested label fix (not applied) |
+| `suggested_label_fixes.json` | **unverified errata, not applied**: suspected val/test label errors with a suggested correction (some coordinates are detector output) |
 | `aircraft_c_manifest.json` | Aircraft-C corruptions, groups, parameters, severities and seed |
 | `build_report.json` | counts from the build (duplicates removed, caps, leakage audit) |
 | `leakage_stats.txt` | leakage-audit counts by transform, source and class |
@@ -39,43 +40,43 @@ Split lists hold paths relative to the dataset root (`images/<split>/<file>`), e
 
 | id | class | affiliation | train | val (full) | val (clean) | test (full) | test (clean) |
 |---|---|---|---|---|---|---|---|
-| 1 | Rafale | allied | 326 | 93 | 92 | 46 | 43 |
-| 2 | Tejas | allied | 118 | 34 | 25 | 17 | 15 |
-| 3 | Mirage-2000 | allied | 233 | 67 | 58 | 33 | 27 |
-| 4 | MiG-29 | allied | 207 | 59 | 52 | 29 | 23 |
-| 6 | C-17 | allied | 608 | 176 | 156 | 85 | 72 |
+| 1 | Rafale | allied | 326 | 93 | 90 | 46 | 43 |
+| 2 | Tejas | allied | 118 | 34 | 21 | 17 | 13 |
+| 3 | Mirage-2000 | allied | 233 | 67 | 54 | 33 | 27 |
+| 4 | MiG-29 | allied | 207 | 59 | 51 | 29 | 23 |
+| 6 | C-17 | allied | 608 | 176 | 155 | 85 | 72 |
 | 7 | C-130J | allied | 145 | 42 | 37 | 21 | 16 |
 | 8 | C-295 | allied | 204 | 58 | 55 | 29 | 27 |
 | 9 | An-32 | allied | 124 | 35 | 29 | 18 | 15 |
-| 10 | AH-64 | allied | 392 | 111 | 107 | 56 | 54 |
+| 10 | AH-64 | allied | 392 | 111 | 105 | 56 | 52 |
 | 11 | CH-47 | allied | 485 | 142 | 134 | 74 | 67 |
 | 12 | HAL-Prachand | allied | 219 | 62 | 60 | 31 | 30 |
 | 13 | HAL-Dhruv | allied | 212 | 60 | 38 | 30 | 15 |
 | 14 | HAL-Rudra | allied | 195 | 56 | 45 | 28 | 20 |
 | 15 | HAL-LUH | allied | 306 | 88 | 83 | 44 | 41 |
 | 16 | HAL-Chetak | allied | 189 | 54 | 41 | 27 | 17 |
-| 17 | Mi-26 | allied | 262 | 74 | 43 | 37 | 14 |
-| 18 | J-20 | adversary | 352 | 98 | 96 | 50 | 46 |
-| 19 | J-10 | adversary | 260 | 69 | 67 | 34 | 30 |
-| 22 | H-6 | adversary | 212 | 59 | 52 | 29 | 24 |
-| 23 | Y-20 | adversary | 203 | 57 | 47 | 28 | 19 |
-| 24 | JH-7 | adversary | 157 | 45 | 40 | 22 | 19 |
-| 26 | Z-10 | adversary | 102 | 29 | 15 | 14 | 4 |
-| 27 | WZ-7 | adversary | 116 | 33 | 18 | 17 | 13 |
-| 28 | JF-17 | adversary | 173 | 49 | 37 | 25 | 19 |
-| 29 | F-16 | adversary | 696 | 202 | 192 | 102 | 97 |
-| 32 | Mi-8-17 | ambiguous | 529 | 150 | 125 | 74 | 63 |
-| 33 | Il-76-78 | ambiguous | 329 | 93 | 75 | 47 | 39 |
-| 34 | Mi-24-35 | ambiguous | 320 | 93 | 73 | 45 | 35 |
-| 35 | other_aircraft | unknown | 2207 | 613 | 595 | 321 | 309 |
+| 17 | Mi-26 | allied | 262 | 74 | 38 | 37 | 14 |
+| 18 | J-20 | adversary | 352 | 98 | 95 | 50 | 43 |
+| 19 | J-10 | adversary | 260 | 69 | 64 | 34 | 30 |
+| 22 | H-6 | adversary | 212 | 59 | 50 | 29 | 21 |
+| 23 | Y-20 | adversary | 203 | 57 | 43 | 28 | 18 |
+| 24 | JH-7 | adversary | 157 | 45 | 37 | 22 | 17 |
+| 26 | Z-10 | adversary | 102 | 29 | 14 | 14 | 3 |
+| 27 | WZ-7 | adversary | 116 | 33 | 15 | 17 | 13 |
+| 28 | JF-17 | adversary | 173 | 49 | 33 | 25 | 19 |
+| 29 | F-16 | adversary | 696 | 202 | 182 | 102 | 94 |
+| 32 | Mi-8-17 | ambiguous | 529 | 150 | 123 | 74 | 62 |
+| 33 | Il-76-78 | ambiguous | 329 | 93 | 70 | 47 | 37 |
+| 34 | Mi-24-35 | ambiguous | 320 | 93 | 69 | 45 | 35 |
+| 35 | other_aircraft | unknown | 2207 | 613 | 573 | 321 | 295 |
 
 ## Splits
 
 | split | images (full) | images (clean) | boxes (full) | boxes (clean) |
 |---|---|---|---|---|
 | train | 9019 | – | 15503 | – |
-| val | 2576 | 2284 | 4256 | 3809 |
-| test | 1286 | 1098 | 2199 | 1922 |
+| val | 2576 | 2221 | 4256 | 3542 |
+| test | 1286 | 1071 | 2199 | 1794 |
 
 Report results on the **clean** val/test lists. The full lists are kept for comparison with earlier numbers.
 
@@ -93,11 +94,19 @@ Report results on the **clean** val/test lists. The full lists are kept for comp
    rarest class (seed 42).
 5. **Flip/rotation-invariant leakage audit.** Each val image (against train) and test image (against train + val)
    is hashed as-is, mirrored horizontally, mirrored vertically and rotated 180 degrees. It is flagged if, for one
-   variant, both the whole-image and the crop pHash are within distance 6 of one image. 292 val and 188 test images
-   were flagged and are left out of the clean lists (see `leakage_stats.txt`).
-6. **Class merge.** Classes with fewer than 50 training images are relabelled `other_aircraft`
+   variant, both the whole-image and the crop pHash are within distance 6 of one image.
+6. **Clean lists.** The labels are the original exports; no label is corrected. `val_clean` / `test_clean` leave
+   out, in this order: images flagged in step 5 (292 val, 188 test);
+   images with two GT boxes overlapping at IoU >= 0.5 (34 val,
+   14 test); and images with two GT boxes sharing one x-range, i.e. both left
+   and right edges within 0.002 of the image width (29 val,
+   13 test). Only labels and image hashes decide; no model predictions or manual
+   choices. The last two rules catch duplicate boxes and an export defect in which several boxes of an image got
+   the horizontal extent of one aircraft; they also remove some correctly labelled, tightly packed or aligned
+   formations.
+7. **Class merge.** Classes with fewer than 50 training images are relabelled `other_aircraft`
    (same ids, so the class list is stable).
-7. **Aircraft-C.** Every test image is corrupted with 9 corruptions x 3 severities,
+8. **Aircraft-C.** Every test image is corrupted with 9 corruptions x 3 severities,
    deterministic per image (seed 1234): defocus_blur (seen), motion_blur (seen), fog (seen), low_light (seen), gaussian_noise (seen), jpeg (seen), downscale (seen), contrast (held-out), rain (held-out). Held-out corruptions are never used for training-time
    augmentation.
 
@@ -109,6 +118,14 @@ Report results on the **clean** val/test lists. The full lists are kept for comp
   long-range surveillance or operational sensor imagery.
 - **Labels.** Boxes and types come from three sources with different annotators. Expect some type confusions
   (e.g. look-alike fighters) and missing boxes on secondary aircraft.
+- **Label errors are not corrected.** `suggested_label_fixes.json` lists 87 val/test images whose exported
+  boxes look wrong, with suggested corrections. They are unverified and not applied, and they are not used in our
+  evaluation; for 'relocate' suggestions the horizontal box extents come from a yolo26s detector. The
+  clean lists leave the affected val/test images out by the geometry rules above. In train,
+  154 label files have two boxes sharing one x-range and 101 have two boxes at
+  IoU >= 0.5; train is used as exported.
+- **Leakage audit depends on boxes.** The audit's crop hash uses the largest box, so an image whose largest box is
+  misplaced can escape it. Most such images are removed by the geometry rules anyway.
 - **Imbalance.** Some types have few test images even before cleaning (e.g. Z-10: 14 full, 4 clean). Per-class
   scores for these are noisy.
 - **Residual leakage.** The audit catches near-identical copies, mirrors and 180-degree rotations only. Crops,
