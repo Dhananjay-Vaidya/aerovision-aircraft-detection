@@ -2,9 +2,8 @@
 \toprule
 Model & Forward ms & End-to-end ms & FPS \\
 \midrule
-YOLOv8-s & \textbf{5.5} & 12.1 & 82.4 \\
-YOLO26-s & 15.5 & 18.5 & 54.1 \\
-YOLO26-s + plain FT & 9.1 & \textbf{11.2} & \textbf{89.0} \\
-YOLO26-s + degradation FT & 12.3 & 16.0 & 62.7 \\
+YOLOv8-s & \textbf{5.1} & \textbf{8.0} & \textbf{124.7} \\
+YOLO26-s & 8.3 & 10.9 & 91.3 \\
 \bottomrule
+\multicolumn{4}{p{\linewidth}}{\footnotesize RTX 3050 Laptop GPU, FP16, batch 1, 640 px; minimum of 3 rounds (9 for YOLO26-s, pooled over the three fine-tunes, which share one architecture) of 300 timed runs after 50 warm-up; laptop clocks fluctuate, so medians are not reported.} \\
 \end{tabular}

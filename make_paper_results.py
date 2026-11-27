@@ -8,8 +8,8 @@ Inputs per model (Part B of the final evaluation, clean splits R1-R3):
   results/<key>_clean_test.json, <key>_full_test.json   eval_test.py
   results/<key>.csv, <key>_per_class.csv                evaluate.py (Aircraft-C on the clean test file names)
   results/<key>_abstain.json, <key>_matched_abstain.json, <key>_matched_riskcov.csv   abstain.py (r* 0.05, 0.10)
-  results/speed_rounds.csv                              speed.py, 3 runs per model (column "round"); median used
-                                                        (falls back to results/speed_final.csv, one run)
+  results/speed_rounds.csv                              speed.py, 3 rounds per model (column "round"); the minimum
+                                                        over rounds is reported (t6: YOLO26-s pooled over its 3 fine-tunes)
 Outputs
   results/summary.md                one table, every number, one column per model
   paper_assets/tables/*.tex         booktabs tabulars (no table wrapper): t3_clean, t4_robust, t5_abstain, t6_speed,
@@ -79,20 +79,32 @@ def load_model(key: str) -> dict | None:
     m["per_class"] = pd.read_csv(pc) if pc.exists() else None
     rc = RES / f"{key}_matched_riskcov.csv"
     m["riskcov_matched"] = pd.read_csv(rc) if rc.exists() else None
-    # speed_rounds.csv: several runs of the same protocol (column "round"); the laptop GPU's clocks vary by up to
-    # ~50 % between runs, so each statistic is the median over rounds. Falls back to a single speed_final.csv run.
-    m["speed"], m["speed_rounds"] = None, 0
-    for sp in (RES / "speed_rounds.csv", RES / "speed_final.csv"):
-        if not sp.exists():
-            continue
-        s = pd.read_csv(sp)
-        s = s[s["model"] == key]
-        if len(s):
-            num = ["ms_mean", "ms_p95", "fps", "fps_p95"]
-            m["speed"] = {mode: g[num].median() for mode, g in s.groupby("mode")}
-            m["speed_rounds"] = s["round"].nunique() if "round" in s else 1
-            break
+    # speed_rounds.csv: 3 rounds of the same protocol per model (column "round"). Laptop GPU clocks fluctuate up to
+    # ~2x between rounds, so the minimum over rounds is reported (the least-disturbed run), not the median.
+    m["speed"] = speed_min([key])
     return m
+
+
+SPEED_FOOTNOTE = ("RTX 3050 Laptop GPU, FP16, batch 1, 640 px; minimum of 3 rounds (9 for YOLO26-s, pooled over "
+                  "the three fine-tunes, which share one architecture) of 300 timed runs after 50 warm-up; laptop "
+                  "clocks fluctuate, so medians are not reported.")
+SPEED_GROUPS = {"YOLOv8-s": ["yolov8s"], "YOLO26-s": ["yolo26s", "yolo26s_plainft", "yolo26s_degrade"]}
+
+
+def speed_min(keys):
+    """Minimum mean latency over all rounds of the given models: {"forward": ms, "end_to_end": ms,
+    "fps": 1000 / min end-to-end ms, "n_rounds": n}, or None."""
+    sp = RES / "speed_rounds.csv"
+    if not sp.exists():
+        return None
+    s = pd.read_csv(sp)
+    s = s[s["model"].isin(keys)]
+    if s.empty:
+        return None
+    out = {mode: float(g["ms_mean"].min()) for mode, g in s.groupby("mode")}
+    out["fps"] = 1000.0 / out["end_to_end"] if out.get("end_to_end") else None
+    out["n_rounds"] = int(s.groupby("model")["round"].nunique().sum())
+    return out
 
 
 def ev_row(m, name, col):
@@ -156,20 +168,31 @@ def metric_rows():
                                     ("false_alarms_per_100_images", "Accepted FA / 100 img", "num2")):
                     R.append((sec, f"{kl}, {sl} ({tl})",
                               lambda m, mo=mode, t=t, s=split, k=k: ab(m, mo, t, s, k), kind))
-    sec = ("Speed (RTX 3050 Laptop, FP16, batch 1, 640 px; 50 warm-up + 300 timed; "
-           "median over repeated runs, see results/speed_rounds.csv)")
-    for mode, ml in (("forward", "Forward"), ("end_to_end", "End-to-end")):
-        for k, kl, kind in (("ms_mean", "ms mean", "ms"), ("ms_p95", "ms p95", "ms"), ("fps", "FPS (mean)", "fps"),
-                            ("fps_p95", "FPS (at p95 latency)", "fps")):
-            R.append((sec, f"{ml} {kl}", lambda m, mo=mode, k=k: _speed(m, mo, k), kind))
+    sec = ("Speed (RTX 3050 Laptop, FP16, batch 1, 640 px; 50 warm-up + 300 timed; minimum over rounds, "
+           "raw rounds in results/speed_rounds.csv)")
+    for k, kl, kind in (("forward", "Forward ms (min over this model's rounds)", "ms"),
+                        ("end_to_end", "End-to-end ms (min over this model's rounds)", "ms"),
+                        ("fps", "FPS = 1000 / min end-to-end ms", "fps"), ("n_rounds", "Rounds", "int")):
+        R.append((sec, kl, lambda m, k=k: _speed(m["speed"], k), kind))
+    for k, kl, kind in (("forward", "Forward ms, architecture (as in t6)", "ms"),
+                        ("end_to_end", "End-to-end ms, architecture (as in t6)", "ms"),
+                        ("fps", "FPS, architecture (as in t6)", "fps"),
+                        ("n_rounds", "Rounds pooled, architecture (as in t6)", "int")):
+        R.append((sec, kl, lambda m, k=k: _speed(_arch_speed(m["key"]), k), kind))
     return R
 
 
-def _speed(m, mode, k):
-    s = m["speed"]
-    if not s or mode not in s or k not in s[mode] or pd.isna(s[mode][k]):
+def _arch_speed(key):
+    for keys in SPEED_GROUPS.values():
+        if key in keys:
+            return speed_min(keys)
+    return None
+
+
+def _speed(s, k):
+    if not s or s.get(k) is None or pd.isna(s[k]):
         return None
-    return float(s[mode][k])
+    return float(s[k])
 
 
 def fmt(v, kind):
@@ -192,10 +215,10 @@ def write_summary(models):
           "Percentages for mAP, precision, recall, mPC, rPC, coverage, risk, accuracy and AURC. τ is a confidence "
           "threshold chosen on clean val (maximum coverage with val risk ≤ r*). Accepted FA / 100 img = accepted "
           "detections that match no GT box, per 100 images. – = not available.", "",
-          "Speed caveat: all models were timed in one session (3 rounds, order rotated per round; median reported), "
-          "but the laptop GPU (RTX 3050 Laptop) still varies by up to ~2x between runs of the same protocol. The "
-          "three YOLO26-s models have the same architecture (9.48 M params, 20.8 GFLOPs fused), so speed "
-          "differences between them are measurement noise, not model differences.", ""]
+          "Speed: all models were timed in one session (3 rounds each, order rotated per round). The laptop GPU's "
+          "clocks fluctuate up to ~2x between rounds, so the minimum over rounds is reported, not the median. The "
+          "three YOLO26-s models share one architecture (9.48 M params, 20.8 GFLOPs fused); the paper table (t6) "
+          "pools their 9 rounds into one YOLO26-s row. FPS = 1000 / min end-to-end ms.", ""]
     missing = [lab for k, lab in MODELS if k not in {m["key"] for m in models}]
     if missing:
         md += [f"Not yet evaluated: {', '.join(missing)}.", ""]
@@ -216,7 +239,7 @@ def tex_escape(s: str) -> str:
 
 
 def tex_table(path: Path, header: list[str], rows: list[list], kinds: list[str], better: list[str | None],
-              bold_axis: str = "column", first_col_align="l"):
+              bold_axis: str = "column", first_col_align="l", footnote: str | None = None):
     """rows: [label, v1, v2, ...]; better: per value column 'max' | 'min' | None (no bolding)."""
     vals = [r[1:] for r in rows]
     bold = [[False] * len(kinds) for _ in rows]
@@ -249,7 +272,10 @@ def tex_table(path: Path, header: list[str], rows: list[list], kinds: list[str],
             s = fmt(v, kinds[j]).replace("–", "--")
             cells.append(r"\textbf{" + s + "}" if b[j] and s != "--" else s)
         out.append(" & ".join(cells) + r" \\")
-    out += [r"\bottomrule", r"\end{tabular}"]
+    out.append(r"\bottomrule")
+    if footnote:  # full-width row under the rule, so the tabular stays self-contained
+        out.append(r"\multicolumn{%d}{p{\linewidth}}{\footnotesize %s} \\" % (len(kinds) + 1, tex_escape(footnote)))
+    out.append(r"\end{tabular}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
     print(f"[paper] wrote {path}")
@@ -286,10 +312,14 @@ def write_tables(models):
                 ab(m, "matched", "0.10", "test", "false_alarms_per_100_images")] for m in models],
               ["pct", "pct", "pct", "pct", "pct", "pct", "pct", "num1"],
               ["min", "min", "max", "min", "max", "min", "max", "min"])
-    tex_table(TAB / "t6_speed.tex", ["Model", "Forward ms", "End-to-end ms", "FPS"],
-              [[m["label"], _speed(m, "forward", "ms_mean"), _speed(m, "end_to_end", "ms_mean"),
-                _speed(m, "end_to_end", "fps")] for m in models],
-              ["ms", "ms", "fps"], ["min", "min", "max"])
+    present = {m["key"] for m in models}
+    speed_rows = []
+    for label, keys in SPEED_GROUPS.items():
+        sm = speed_min([k for k in keys if k in present])
+        if sm:
+            speed_rows.append([label, sm.get("forward"), sm.get("end_to_end"), sm.get("fps")])
+    tex_table(TAB / "t6_speed.tex", ["Model", "Forward ms", "End-to-end ms", "FPS"], speed_rows,
+              ["ms", "ms", "fps"], ["min", "min", "max"], footnote=SPEED_FOOTNOTE)
     mpcs = {m["key"]: per_corruption_mpc(m) for m in models}
     tex_table(TAB / "t_percorruption.tex",
               ["Corruption"] + [m["label"] for m in models],
