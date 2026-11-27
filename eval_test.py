@@ -45,7 +45,10 @@ def main(argv=None):
     _, merged, _ = class_merge_map(args.data)
     n_test = len(split_images(data_yaml, "test"))
     model = YOLO(str(weights))
-    n_params, gflops = get_num_params(model.model), get_flops(model.model, args.imgsz)
+    import copy
+    fused = copy.deepcopy(model.model).fuse(verbose=False)  # Conv+BN fused, as deployed (and as speed.py times)
+    n_params, gflops = get_num_params(fused), get_flops(fused, args.imgsz)
+    del fused
     m = model.val(data=str(data_yaml), split="test", imgsz=args.imgsz, batch=args.batch, conf=0.001, half=True,
                   plots=False, verbose=False, workers=args.workers, project=str(ROOT / "runs" / "eval"),
                   name=f"{args.name}_{args.split_set}_test", exist_ok=True)
@@ -62,7 +65,8 @@ def main(argv=None):
         "merged_classes": merged,
         # extra fields (not in the Kaggle file)
         "params": int(n_params), "params_M": round(n_params / 1e6, 3), "gflops": round(float(gflops), 2),
-        "split_set": args.split_set, "n_test_images": n_test, "weights": str(weights),
+        "params_gflops_fused": True,
+        "split_set": args.split_set, "n_images": n_test, "n_test_images": n_test, "weights": str(weights),
         "merged_into": OTHER_CLASS, "min_train_images": MIN_TRAIN_IMAGES,
     }
     out = Path(args.out) if args.out else ROOT / "results" / f"{args.name}_{args.split_set}_test.json"

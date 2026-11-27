@@ -43,7 +43,8 @@ def summarise(ms: list[float]) -> dict:
     a = np.array(ms)
     mean = float(a.mean())
     return {"ms_mean": mean, "ms_std": float(a.std(ddof=1)), "ms_p50": float(np.percentile(a, 50)),
-            "ms_p95": float(np.percentile(a, 95)), "fps": 1000.0 / mean}
+            "ms_p95": float(np.percentile(a, 95)), "fps": 1000.0 / mean,
+            "fps_p95": 1000.0 / float(np.percentile(a, 95))}  # throughput at the p95 latency
 
 
 def main(argv=None):
@@ -54,6 +55,8 @@ def main(argv=None):
     ap.add_argument("--runs", type=int, default=300)
     ap.add_argument("--image", default=None, help="image for end_to_end (default: first test image)")
     ap.add_argument("--out", default=str(ROOT / "results" / "speed.csv"))
+    ap.add_argument("--replace", action="store_true",
+                    help="overwrite --out (default: keep rows of other models already in it)")
     args = ap.parse_args(argv)
 
     import torch
@@ -107,12 +110,18 @@ def main(argv=None):
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["model", "mode", "ms_mean", "ms_std", "ms_p50", "ms_p95", "fps", "ul_preprocess_ms", "ul_inference_ms",
-              "ul_postprocess_ms", "params_M", "gflops", "imgsz", "batch", "precision", "warmup", "runs", "gpu",
-              "torch", "ultralytics", "python", "weights"]
+    fields = ["model", "mode", "ms_mean", "ms_std", "ms_p50", "ms_p95", "fps", "fps_p95", "ul_preprocess_ms",
+              "ul_inference_ms", "ul_postprocess_ms", "params_M", "gflops", "imgsz", "batch", "precision", "warmup",
+              "runs", "gpu", "torch", "ultralytics", "python", "weights"]
+    timed_now = {r["model"] for r in rows}
+    old = []
+    if out.exists() and not args.replace:  # keep the rows of models not timed in this run
+        with open(out, encoding="utf-8") as f:
+            old = [r for r in csv.DictReader(f) if r["model"] not in timed_now]
     with open(out, "w", newline="", encoding="utf-8") as f:
-        wr = csv.DictWriter(f, fieldnames=fields)
+        wr = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         wr.writeheader()
+        wr.writerows(old)
         for r in rows:
             wr.writerow({k: (f"{v:.3f}" if isinstance(v, float) else v) for k, v in r.items()})
     print(f"[speed.py] wrote {out}  (image: {img_path.name}, GPU: {gpu})")
