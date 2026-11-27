@@ -126,7 +126,12 @@ def test_unreadable_video(client, monkeypatch, tmp_path):
 
 def test_video_encoding_and_timing(client, monkeypatch, tmp_path):
     monkeypatch.setattr(server, 'settings', lambda *args: ('test', .5))
-    monkeypatch.setattr(server, 'detect', fake_detect)
+    detection = dict(box=[5, 20, 45, 40], **{'class': 'Rafale'}, conf=.4,
+                     affiliation='allied', decision='uncertain', reason='low confidence')
+    def uncertain_detect(img, model=None, risk=.10):
+        return {**fake_detect(img), 'tau': .5, 'risk': risk,
+                'detections': [detection], 'counts': dict(allied=0, adversary=0, uncertain=1)}
+    monkeypatch.setattr(server, 'detect', uncertain_detect)
     source = tmp_path / 'fixture.avi'
     writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*'MJPG'), 10, (64, 48))
     assert writer.isOpened()
@@ -139,6 +144,9 @@ def test_video_encoding_and_timing(client, monkeypatch, tmp_path):
     response = client.post('/api/video', files={'file': ('test.avi', source.read_bytes())}, data={'every_n': 2})
     assert response.status_code == 200, response.text
     result = response.json()
+    assert result['tau'] == .5
+    assert result['risk'] == .10
+    assert all(row['detections'] == [detection] for row in result['frames'])
     assert [row['frame'] for row in result['frames']] == [0, 2, 4]
     cap = cv2.VideoCapture(str(out / result['url'].split('/')[-1]))
     assert cap.isOpened()

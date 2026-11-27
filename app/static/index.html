@@ -2,7 +2,7 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AeroVision Live</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
 <body>
-<header><div class="brand">AV<span>AeroVision <b>Live</b></span></div><span class="badge">RESEARCH DEMO</span></header>
+<header><div class="brand">AV<span>AeroVision <b>Live</b></span></div><div class="active-calibration" aria-live="polite" aria-label="Active calibration"><span>τ <strong id="header-tau">—</strong></span><span>r* <strong id="header-risk">10%</strong></span></div><span class="badge">RESEARCH DEMO</span></header>
 <main>
 <div class="intro"><p class="eyebrow">AIRCRAFT DETECTION / VISUAL ROBUSTNESS</p><h1>A clearer view.<br><span>A measured decision.</span></h1><p>Detect aircraft, explore degraded imagery, and inspect confidence-based abstention.</p></div>
 <section class="controls" aria-label="Detection settings"><label>Detector<select id="model"><option value="">Loading models…</option></select></label><label>Target risk r*<select id="risk"><option value="0.10">10%</option><option value="0.05">5%</option></select></label><div class="calibration">Matched threshold <strong id="tau">—</strong><small>Calibrated on the paper validation set</small></div></section>

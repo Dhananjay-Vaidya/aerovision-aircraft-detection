@@ -143,6 +143,19 @@ def annotate(img, result):
                 cursor += 16
             cv2.putText(img, part, (cursor, baseline), cv2.FONT_HERSHEY_SIMPLEX, .55, color, 2)
             cursor += cv2.getTextSize(part, cv2.FONT_HERSHEY_SIMPLEX, .55, 2)[0][0]
+        if d['decision'] == 'uncertain':
+            lines = [(d.get('reason') or 'Reason unavailable', color, 2)]
+            if d.get('reason') == 'low confidence' and result.get('tau') is not None:
+                # The sidebar uses the Unicode tau; OpenCV's font requires ASCII.
+                lines.append((f"best guess: {d['class']} ({d['affiliation']}), "
+                              f"conf {d['conf']:.4f}, below tau {result['tau']}", (170, 170, 170), 1))
+            left = max(0, x1)
+            for index, (text, text_color, thickness) in enumerate(lines):
+                line_y = min(img.shape[0] - 5, baseline + 20 * (index + 1))
+                width = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, .5, thickness)[0][0]
+                font_scale = .5 * min(1, max(1, img.shape[1] - left - 5) / max(1, width))
+                cv2.putText(img, text, (left, line_y), cv2.FONT_HERSHEY_SIMPLEX,
+                            font_scale, text_color, thickness, cv2.LINE_AA)
     return img
 
 
@@ -260,7 +273,7 @@ def video_writer(path, fps, size):
 @app.post('/api/video')
 def video(file: UploadFile = File(...), model: str | None = Form(None), risk: float = Form(.10),
           every_n: int = Form(2)):
-    settings(model, risk)
+    model, tau = settings(model, risk)
     if not 1 <= every_n <= 120:
         raise HTTPException(422, 'Frame interval must be between 1 and 120.')
     token = uuid.uuid4().hex
@@ -287,7 +300,8 @@ def video(file: UploadFile = File(...), model: str | None = Form(None), risk: fl
                 result = detect(frame, model, risk)
                 writer.write(cv2.resize(annotate(frame, result), size))
                 summaries.append(dict(frame=index, time_s=round(index / fps, 3),
-                                      counts=result['counts'], inference_ms=result['inference_ms']))
+                                      counts=result['counts'], inference_ms=result['inference_ms'],
+                                      detections=result['detections']))
             index += 1
             ok, frame = cap.read()
         writer.release()
@@ -302,7 +316,8 @@ def video(file: UploadFile = File(...), model: str | None = Form(None), risk: fl
             raw.replace(target)
         completed = True
         return {'url': f'/outputs/{target.name}', 'frames': summaries, 'every_n': every_n,
-                'source_fps': fps, 'processed_frames': len(summaries)}
+                'source_fps': fps, 'processed_frames': len(summaries),
+                'model': model, 'tau': tau, 'risk': risk}
     except HTTPException:
         raise
     except Exception as exc:

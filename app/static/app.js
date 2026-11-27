@@ -15,8 +15,22 @@ function form(file) { const data = new FormData(); data.append('file', file); fo
 function updateTau() {
   const selected = metadata?.models.find(m => m.name === $('model').value);
   $('tau').textContent = selected?.tau[Number($('risk').value).toFixed(2)]?.toFixed(3) ?? '—';
+  showCalibration(selected?.tau[Number($('risk').value).toFixed(2)], Number($('risk').value));
+}
+function showCalibration(tau, risk) {
+  $('header-tau').textContent = Number.isFinite(tau) ? String(tau) : '—';
+  $('header-risk').textContent = Number.isFinite(risk) ? `${risk * 100}%` : '—';
+}
+function uncertaintyDetails(d, tau) {
+  if (d.decision !== 'uncertain') return [];
+  const lines = [d.reason || 'Reason unavailable'];
+  if (d.reason === 'low confidence' && Number.isFinite(tau)) {
+    lines.push(`best guess: ${d.class} (${d.affiliation}), conf ${d.conf.toFixed(4)}, below τ ${tau}`);
+  }
+  return lines;
 }
 function panel(result, fps) {
+  if (Number.isFinite(result.tau)) showCalibration(result.tau, result.risk);
   const now = performance.now();
   $('fps').textContent = (fps ?? (lastResult ? 1000 / (now-lastResult) : 0)).toFixed(1);
   lastResult = now;
@@ -26,12 +40,14 @@ function panel(result, fps) {
   for (const d of result.detections) {
     const li = document.createElement('li'); li.style.color = colors[d.decision];
     li.textContent = `${d.class} · ${(d.conf*100).toFixed(0)}% · ${d.decision}`;
-    if (d.reason) { const small = document.createElement('small'); small.textContent = d.reason; li.append(small); }
+    const [reason, guess] = uncertaintyDetails(d, result.tau);
+    if (reason) { const strong = document.createElement('strong'); strong.className = 'uncertainty-reason'; strong.textContent = reason; li.prepend(strong); }
+    if (guess) { const small = document.createElement('small'); small.className = 'best-guess'; small.textContent = guess; li.append(small); }
     $('detections').append(li);
   }
   if (!result.detections.length) { const li=document.createElement('li'); li.className='empty'; li.textContent='No aircraft detected above 25% confidence.'; $('detections').append(li); }
 }
-function draw(canvas, source, detections) {
+function draw(canvas, source, detections, tau) {
   const w = source.naturalWidth || source.videoWidth || source.width, h = source.naturalHeight || source.videoHeight || source.height;
   canvas.width=w; canvas.height=h; canvas.hidden=false;
   const ctx=canvas.getContext('2d'); ctx.drawImage(source,0,0,w,h);
@@ -40,10 +56,16 @@ function draw(canvas, source, detections) {
     const [x,y,x2,y2]=d.box; ctx.strokeStyle=colors[d.decision];
     ctx.setLineDash(d.decision==='adversary'?[10*scale,6*scale]:d.decision==='uncertain'?[2*scale,5*scale]:[]);
     ctx.strokeRect(x,y,x2-x,y2-y); ctx.setLineDash([]);
-    const label=`${d.class} · ${(d.conf*100).toFixed(0)}% · ${d.decision}`;
-    const textWidth=ctx.measureText(label).width, ly=Math.max(20*scale,y);
-    ctx.fillStyle='#0c1117'; ctx.fillRect(x,ly-21*scale,Math.min(w-x,textWidth+12*scale),21*scale);
-    ctx.fillStyle=colors[d.decision]; ctx.fillText(label,x+5*scale,ly-5*scale);
+    const details=uncertaintyDetails(d,tau);
+    const lines=[{text:`${d.class} · ${(d.conf*100).toFixed(0)}% · ${d.decision}`,color:colors[d.decision]},
+      ...details.map((text,index)=>({text,color:index===0?colors.uncertain:'#9aaaba',bold:index===0}))];
+    const lineHeight=21*scale, left=Math.max(0,Math.min(x,w-12*scale));
+    const top=Math.max(0,Math.min(y-lines.length*lineHeight,h-lines.length*lineHeight));
+    for (const [index,line] of lines.entries()) {
+      ctx.font=`${line.bold?'bold ':''}${14*scale}px Segoe UI, sans-serif`;
+      ctx.fillStyle='#0c1117';ctx.fillRect(left,top+index*lineHeight,Math.min(w-left,ctx.measureText(line.text).width+12*scale),lineHeight);
+      ctx.fillStyle=line.color;ctx.fillText(line.text,left+5*scale,top+(index+1)*lineHeight-5*scale,w-left-10*scale);
+    }
   }
 }
 async function loadImage(url) { const img=new Image(); img.src=url; await img.decode(); return img; }
@@ -65,14 +87,15 @@ $('detect').onclick=()=>task($('detect'),async()=>{
   const data=form(imageFile); data.append('corruption',$('corruption').value);data.append('severity',$('severity').value);
   const started=performance.now(), result=await api('/api/detect',{method:'POST',body:data});
   const img=await loadImage(`data:${result.image_mime};base64,${result.image_base64}`);
-  draw($('image-canvas'),img,result.detections); panel(result,1000/(performance.now()-started));
+  draw($('image-canvas'),img,result.detections,result.tau); panel(result,1000/(performance.now()-started));
 });
-let videoSummaries=[];
+let videoSummaries=[], videoCalibration={};
 $('process-video').onclick=()=>task($('process-video'),async()=>{
   const file=$('video-file').files[0]; if(!file) throw new Error('Choose a video file first.');
   const data=form(file); data.append('every_n',$('every-n').value);
   message('Processing video. This may take a few minutes.');
   const result=await api('/api/video',{method:'POST',body:data});videoSummaries=result.frames;
+  videoCalibration={tau:result.tau,risk:result.risk};
   $('video-result').src=result.url;$('video-result').hidden=false;
   $('video-download').href=result.url;$('video-download').hidden=false;
   message(`Processed ${result.processed_frames} frames. Video is ready.`);
@@ -81,7 +104,7 @@ $('process-video').onclick=()=>task($('process-video'),async()=>{
 function updateVideoPanel() {
   const t=$('video-result').currentTime; let entry=videoSummaries[0];
   for (const row of videoSummaries) { if (row.time_s>t) break; entry=row; }
-  if(entry) { panel({...entry,detections:[]},0); $('detections').replaceChildren(); const li=document.createElement('li');li.className='empty';li.textContent=`Frame ${entry.frame}: counts shown above. Labels are embedded in the video.`;$('detections').append(li); }
+  if(entry) panel({...videoCalibration,...entry,detections:entry.detections||[]},0);
 }
 $('video-result').ontimeupdate=updateVideoPanel;
 $('video-result').onerror=()=>message('The browser could not play this video. Download the MP4, or check the server’s H.264 encoder.');
@@ -107,7 +130,7 @@ $('webcam-start').onclick=async()=>{
         capture.toBlob(blob=>{if(blob&&socket?.readyState===WebSocket.OPEN) socket.send(blob); else inFlight=false;},'image/jpeg',.85);
       },100);
     };
-    socket.onmessage=e=>{try {const result=JSON.parse(e.data); if(result.error) {message(result.error);stopWebcam();return;} draw($('webcam-canvas'),sentFrame,result.detections);panel(result);}catch(error){message(error.message);}finally{inFlight=false;}};
+    socket.onmessage=e=>{try {const result=JSON.parse(e.data); if(result.error) {message(result.error);stopWebcam();return;} draw($('webcam-canvas'),sentFrame,result.detections,result.tau);panel(result);}catch(error){message(error.message);}finally{inFlight=false;}};
     socket.onerror=()=>{message('Webcam connection failed. Check that the server is running.');stopWebcam();};
     socket.onclose=()=>{message('Webcam connection closed. Start again to reconnect.');stopWebcam();};
   } catch(e) {stopWebcam();message(`Could not start webcam: ${e.message}`);}
