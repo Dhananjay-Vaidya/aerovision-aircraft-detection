@@ -1,0 +1,39 @@
+{
+  "title": "AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)",
+  "upload_type": "dataset",
+  "version": "1.0.0",
+  "description": "<p>Code and dataset release (labels, splits and metadata; no images) for military-aircraft detection with affiliation labels: 12,881 images, 28 aircraft types, leakage-audited clean validation and test lists, the Aircraft-C corruption benchmark (9 corruptions x 3 severities), selective (abstaining) affiliation decisions, and all trained-model results. Images are not redistributed. Labels and metadata: CC BY 4.0. Code: MIT.</p>",
+  "creators": [
+    {
+      "name": "Vaidya, Dhananjay",
+      "affiliation": "Dwarkadas J. Sanghvi College of Engineering, Mumbai"
+    },
+    {
+      "name": "Mangla, Monika",
+      "affiliation": "Dwarkadas J. Sanghvi College of Engineering, Mumbai",
+      "orcid": "0000-0002-1752-7226"
+    }
+  ],
+  "license": "cc-by-4.0",
+  "keywords": [
+    "aircraft detection",
+    "object detection",
+    "YOLO",
+    "robustness",
+    "corruption benchmark",
+    "selective prediction",
+    "dataset"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/Dhananjay-Vaidya/aerovision-aircraft-detection",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://universe.roboflow.com/superradarosint/merge_dataset-9nrmd",
+      "relation": "isDerivedFrom",
+      "resource_type": "dataset"
+    }
+  ]
+}
