@@ -8,6 +8,7 @@ type: dataset
 authors:
   - family-names: Vaidya
     given-names: Dhananjay
+    orcid: "https://orcid.org/0009-0007-4283-9460"
   - family-names: Mangla
     given-names: Monika
     orcid: "https://orcid.org/0000-0002-1752-7226"
