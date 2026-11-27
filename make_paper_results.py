@@ -192,10 +192,10 @@ def write_summary(models):
           "Percentages for mAP, precision, recall, mPC, rPC, coverage, risk, accuracy and AURC. τ is a confidence "
           "threshold chosen on clean val (maximum coverage with val risk ≤ r*). Accepted FA / 100 img = accepted "
           "detections that match no GT box, per 100 images. – = not available.", "",
-          "Speed caveat: the laptop GPU (RTX 3050 Laptop) varies by up to ~50 % between runs of the same protocol, "
-          "and the rounds of different models were not all timed in one session. The three YOLO26-s models have "
-          "the same architecture (9.48 M params, 20.8 GFLOPs fused), so speed differences between them are "
-          "measurement noise, not model differences.", ""]
+          "Speed caveat: all models were timed in one session (3 rounds, order rotated per round; median reported), "
+          "but the laptop GPU (RTX 3050 Laptop) still varies by up to ~2x between runs of the same protocol. The "
+          "three YOLO26-s models have the same architecture (9.48 M params, 20.8 GFLOPs fused), so speed "
+          "differences between them are measurement noise, not model differences.", ""]
     missing = [lab for k, lab in MODELS if k not in {m["key"] for m in models}]
     if missing:
         md += [f"Not yet evaluated: {', '.join(missing)}.", ""]

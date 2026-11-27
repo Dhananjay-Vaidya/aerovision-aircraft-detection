@@ -2,7 +2,7 @@
 
 Percentages for mAP, precision, recall, mPC, rPC, coverage, risk, accuracy and AURC. τ is a confidence threshold chosen on clean val (maximum coverage with val risk ≤ r*). Accepted FA / 100 img = accepted detections that match no GT box, per 100 images. – = not available.
 
-Speed caveat: the laptop GPU (RTX 3050 Laptop) varies by up to ~50 % between runs of the same protocol, and the rounds of different models were not all timed in one session. The three YOLO26-s models have the same architecture (9.48 M params, 20.8 GFLOPs fused), so speed differences between them are measurement noise, not model differences.
+Speed caveat: all models were timed in one session (3 rounds, order rotated per round; median reported), but the laptop GPU (RTX 3050 Laptop) still varies by up to ~2x between runs of the same protocol. The three YOLO26-s models have the same architecture (9.48 M params, 20.8 GFLOPs fused), so speed differences between them are measurement noise, not model differences.
 
 | Metric | YOLOv8-s | YOLO26-s | YOLO26-s + plain FT | YOLO26-s + degradation FT |
 |---|---:|---:|---:|---:|
@@ -100,11 +100,11 @@ Speed caveat: the laptop GPU (RTX 3050 Laptop) varies by up to ~50 % between run
 | Affiliation acc., Aircraft-C (r*=10%) | 85.9 | 86.9 | 83.7 | 88.7 |
 | Accepted FA / 100 img, Aircraft-C (r*=10%) | 1.63 | 1.93 | 4.80 | 3.85 |
 | **Speed (RTX 3050 Laptop, FP16, batch 1, 640 px; 50 warm-up + 300 timed; median over repeated runs, see results/speed_rounds.csv)** | | | | |
-| Forward ms mean | 8.3 | 13.3 | 14.9 | 8.5 |
-| Forward ms p95 | 14.0 | 25.0 | 24.0 | 13.6 |
-| Forward FPS (mean) | 120.9 | 74.9 | 67.0 | 117.2 |
-| Forward FPS (at p95 latency) | 71.4 | 40.1 | 41.7 | 73.4 |
-| End-to-end ms mean | 13.6 | 21.5 | 19.8 | 11.7 |
-| End-to-end ms p95 | 20.9 | 31.2 | 29.8 | 18.9 |
-| End-to-end FPS (mean) | 73.5 | 46.4 | 50.5 | 85.6 |
-| End-to-end FPS (at p95 latency) | 47.9 | 32.1 | 33.6 | 53.0 |
+| Forward ms mean | 5.5 | 15.5 | 9.1 | 12.3 |
+| Forward ms p95 | 9.8 | 23.8 | 14.1 | 21.0 |
+| Forward FPS (mean) | 180.6 | 64.6 | 110.3 | 81.3 |
+| Forward FPS (at p95 latency) | 102.2 | 42.1 | 70.8 | 47.6 |
+| End-to-end ms mean | 12.1 | 18.5 | 11.2 | 16.0 |
+| End-to-end ms p95 | 21.2 | 30.1 | 16.7 | 25.4 |
+| End-to-end FPS (mean) | 82.4 | 54.1 | 89.0 | 62.7 |
+| End-to-end FPS (at p95 latency) | 47.2 | 33.2 | 59.8 | 39.4 |
