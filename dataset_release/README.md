@@ -1,4 +1,4 @@
-# AeroVision aircraft dataset: labels, splits and the Aircraft-C benchmark
+# AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)
 
 Version 1.0.0. Annotations, splits and metadata for a 36-class military-aircraft detection dataset, with
 affiliation labels (allied / adversary / ambiguous / unknown) and Aircraft-C, a synthetic corruption benchmark.
@@ -150,7 +150,7 @@ redistributed with attribution. See [LICENSE](LICENSE).
 
 ```bibtex
 @misc{vaidya2026aerovision,
-  title        = {AeroVision aircraft dataset: labels, splits and the Aircraft-C benchmark},
+  title        = {AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)},
   author       = {Vaidya, Dhananjay and Mangla, Monika},
   year         = {2026},
   version      = {1.0.0},

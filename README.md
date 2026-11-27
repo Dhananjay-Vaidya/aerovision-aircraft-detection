@@ -1,4 +1,4 @@
-# aerovision-aircraft-detection
+# AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)
 YOLO-based aircraft detection and affiliation classification with degradation-aware training, robustness evaluation, and confidence-based abstention for uncertain predictions.
 
 ## Dataset & licence

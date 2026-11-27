@@ -30,7 +30,7 @@ DS = ROOT / "cvs_dataset"
 OUT = ROOT / "dataset_release"
 URL = {s["tag"]: f"https://universe.roboflow.com/{s['workspace']}/{s['project']}" for s in SOURCES}
 REPO = "https://github.com/Dhananjay-Vaidya/aerovision-aircraft-detection"
-TITLE = "AeroVision aircraft dataset: labels, splits and the Aircraft-C benchmark"
+TITLE = "AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)"
 VERSION = "1.0.0"
 SPLITS = ("train", "val", "test")
 
