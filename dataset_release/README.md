@@ -1,6 +1,8 @@
 # AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)
 
-Version 1.0.0. Annotations, splits and metadata for a 36-class military-aircraft detection dataset, with
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24608077.svg)](https://doi.org/10.5281/zenodo.24608077)
+
+Version 1.0.0, DOI [10.5281/zenodo.24608077](https://doi.org/10.5281/zenodo.24608077). Annotations, splits and metadata for a 36-class military-aircraft detection dataset, with
 affiliation labels (allied / adversary / ambiguous / unknown) and Aircraft-C, a synthetic corruption benchmark.
 **No images are included.** Images stay with their original owners and are rebuilt from the three Roboflow
 sources (see [rebuild.md](rebuild.md)).
@@ -149,13 +151,14 @@ redistributed with attribution. See [LICENSE](LICENSE).
 ## Citation
 
 ```bibtex
-@misc{vaidya2026aerovision,
-  title        = {AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)},
-  author       = {Vaidya, Dhananjay and Mangla, Monika},
-  year         = {2026},
-  version      = {1.0.0},
-  howpublished = {\url{https://github.com/Dhananjay-Vaidya/aerovision-aircraft-detection}},
-  note         = {Annotations and splits under CC BY 4.0; images not included}
+@dataset{vaidya2026aerovision,
+  author    = {Vaidya, Dhananjay and Mangla, Monika},
+  title     = {AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {1.0.0},
+  doi       = {10.5281/zenodo.24608077},
+  url       = {https://doi.org/10.5281/zenodo.24608077}
 }
 ```
 

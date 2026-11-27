@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this code or the dataset release, please cite it as below."
+message: "If you use this dataset or code, please cite it as below. Labels and metadata: CC BY 4.0; code: MIT."
 title: "AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)"
 abstract: >-
   Code and dataset release (labels, splits and metadata; no images) for military-aircraft detection with
@@ -12,10 +12,9 @@ authors:
     given-names: Monika
     orcid: "https://orcid.org/0000-0002-1752-7226"
 version: 1.0.0
+doi: 10.5281/zenodo.24608077
 date-released: "2026-11-27"
-license:
-  - CC-BY-4.0
-  - MIT
+license: CC-BY-4.0
 repository-code: "https://github.com/Dhananjay-Vaidya/aerovision-aircraft-detection"
 keywords:
   - aircraft detection
@@ -25,7 +24,7 @@ keywords:
   - selective prediction
   - dataset
 references:
-  - type: dataset
+  - type: data
     title: merge_dataset
     authors:
       - name: SuperRadarOSINT

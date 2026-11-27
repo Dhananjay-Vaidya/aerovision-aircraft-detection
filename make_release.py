@@ -32,6 +32,17 @@ URL = {s["tag"]: f"https://universe.roboflow.com/{s['workspace']}/{s['project']}
 REPO = "https://github.com/Dhananjay-Vaidya/aerovision-aircraft-detection"
 TITLE = "AeroVision: A Leakage-Audited Dataset and Corruption Benchmark for Robust Military Aircraft Identification (dataset labels, splits, code and results)"
 VERSION = "1.0.0"
+DOI = "10.5281/zenodo.24608077"  # Zenodo record of v1.0.0
+DOI_BADGE = f"[![DOI](https://zenodo.org/badge/DOI/{DOI}.svg)](https://doi.org/{DOI})"
+BIBTEX = f"""@dataset{{vaidya2026aerovision,
+  author    = {{Vaidya, Dhananjay and Mangla, Monika}},
+  title     = {{{TITLE}}},
+  year      = {{2026}},
+  publisher = {{Zenodo}},
+  version   = {{{VERSION}}},
+  doi       = {{{DOI}}},
+  url       = {{https://doi.org/{DOI}}}
+}}"""
 SPLITS = ("train", "val", "test")
 
 
@@ -161,7 +172,9 @@ def write_card(names, aff, merged, train_counts, stats, n, nbox, m, fx):
     corr = ", ".join(f"{c['name']} ({c['group'].replace('_', '-')})" for c in m["corruptions"])
     text = f"""# {TITLE}
 
-Version {VERSION}. Annotations, splits and metadata for a 36-class military-aircraft detection dataset, with
+{DOI_BADGE}
+
+Version {VERSION}, DOI [{DOI}](https://doi.org/{DOI}). Annotations, splits and metadata for a 36-class military-aircraft detection dataset, with
 affiliation labels (allied / adversary / ambiguous / unknown) and Aircraft-C, a synthetic corruption benchmark.
 **No images are included.** Images stay with their original owners and are rebuilt from the three Roboflow
 sources (see [rebuild.md](rebuild.md)).
@@ -282,14 +295,7 @@ redistributed with attribution. See [LICENSE](LICENSE).
 ## Citation
 
 ```bibtex
-@misc{{vaidya2026aerovision,
-  title        = {{{TITLE}}},
-  author       = {{Vaidya, Dhananjay and Mangla, Monika}},
-  year         = {{2026}},
-  version      = {{{VERSION}}},
-  howpublished = {{\\url{{{REPO}}}}},
-  note         = {{Annotations and splits under CC BY 4.0; images not included}}
-}}
+{BIBTEX}
 ```
 
 Please also credit merge_dataset by SuperRadarOSINT ({URL['merge']}, CC BY 4.0).
