@@ -472,10 +472,38 @@ def main():
             print(f"[paper] {m['key']}: missing {', '.join(miss)}")
     write_summary(models)
     write_tables(models)
+    write_tau(models)
     fig_robustness(models)
     fig_riskcov(models)
     fig_perclass(models)
     fig_ft_gain(models)
+    if any(m["key"] == "yolo26s_degrade" for m in models):
+        import make_extra_figures  # fig_dataset_flow, fig_leakage_examples, fig_qualitative
+        make_extra_figures.main()
+    else:
+        print("[paper] extra figures skipped: fig_qualitative needs yolo26s_degrade")
+
+
+def write_tau(models):
+    """Add the abstention thresholds (tau chosen on clean val) to paper_assets/numbers.json under 'abstention_tau';
+    the other keys (written by audit_leakage.py) are kept."""
+    p = ROOT / "paper_assets" / "numbers.json"
+    num = _json(p) or {}
+    out = {}
+    for m in models:
+        e = {}
+        for mode in ("all", "matched"):
+            a = m["abstain"][mode]
+            if a is None:
+                continue
+            e[mode] = {t: a["by_target"][t]["val"]["threshold"] for t in TARGETS if t in a.get("by_target", {})}
+            e["det_conf"] = a.get("det_conf")
+        out[m["key"]] = e
+    num["abstention_tau"] = out
+    num["abstention_tau_note"] = ("tau per model, risk mode (all / matched) and target risk r*, chosen on clean val "
+                                  "(maximum coverage with val risk <= r*); written by make_paper_results.py")
+    p.write_text(json.dumps(num, indent=2), encoding="utf-8")  # same format as audit_leakage.py
+    print(f"[paper] wrote abstention_tau to {p}")
 
 
 if __name__ == "__main__":
