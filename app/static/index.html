@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AeroVision Live</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<header><div class="brand">AV<span>AeroVision <b>Live</b></span></div><span class="badge">RESEARCH DEMO</span></header>
+<main>
+<div class="intro"><p class="eyebrow">AIRCRAFT DETECTION / VISUAL ROBUSTNESS</p><h1>A clearer view.<br><span>A measured decision.</span></h1><p>Detect aircraft, explore degraded imagery, and inspect confidence-based abstention.</p></div>
+<section class="controls" aria-label="Detection settings"><label>Detector<select id="model"><option value="">Loading models…</option></select></label><label>Target risk r*<select id="risk"><option value="0.10">10%</option><option value="0.05">5%</option></select></label><div class="calibration">Matched threshold <strong id="tau">—</strong><small>Calibrated on the paper validation set</small></div></section>
+<div id="message" role="status" aria-live="polite" hidden></div>
+<div class="workspace"><section class="viewer">
+<nav class="tabs" role="tablist" aria-label="Input source"><button id="tab-image" role="tab" aria-selected="true" aria-controls="image" data-tab="image">Image</button><button id="tab-video" role="tab" aria-selected="false" aria-controls="video" data-tab="video">Video file</button><button id="tab-webcam" role="tab" aria-selected="false" aria-controls="webcam" data-tab="webcam">Webcam (browser)</button><button id="tab-camera" role="tab" aria-selected="false" aria-controls="camera" data-tab="camera">IP / RTSP camera</button></nav>
+<section id="image" role="tabpanel" aria-labelledby="tab-image">
+<div class="toolrow"><label>Simulate degradation<select id="corruption"><option value="none">None</option></select></label><label>Severity <output id="severity-value">1</output><input id="severity" type="range" min="1" max="3" step="1" value="1"></label></div>
+<label id="dropzone" class="upload">Drop an image here, or <span>browse files</span><input id="image-file" type="file" accept="image/*"><small>JPEG, PNG, WebP, BMP</small></label>
+<button id="detect" class="primary" disabled>Detect aircraft</button>
+<canvas id="image-canvas" hidden aria-label="Aircraft detections on uploaded image"></canvas>
+</section>
+<section id="video" role="tabpanel" aria-labelledby="tab-video" hidden><div class="toolrow"><label>Video file<input id="video-file" type="file" accept="video/*"></label><label>Process every Nth frame<input id="every-n" type="number" min="1" max="120" value="2"></label></div><p class="hint">Processed frames retain the original timeline. Audio is omitted.</p><button id="process-video" class="primary">Process video</button><video id="video-result" controls playsinline hidden></video><a id="video-download" hidden download>Download annotated MP4</a></section>
+<section id="webcam" role="tabpanel" aria-labelledby="tab-webcam" hidden><p class="hint">Uses this browser’s camera. Frames are sent to your local server at up to 10 FPS.</p><div class="actions"><button id="webcam-start" class="primary">Start webcam</button><button id="webcam-stop" disabled>Stop</button></div><video id="webcam-source" autoplay muted playsinline hidden></video><canvas id="webcam-canvas" hidden aria-label="Live webcam detections"></canvas></section>
+<section id="camera" role="tabpanel" aria-labelledby="tab-camera" hidden><label>Camera URL or local webcam index<input id="camera-source" type="text" placeholder="rtsp://192.168.1.20:554/stream or 0" autocomplete="off"></label><p class="hint">The camera must be reachable from the computer running AeroVision.</p><div class="actions"><button id="camera-start" class="primary">Connect camera</button><button id="camera-stop" disabled>Stop</button></div><img id="camera-feed" alt="Annotated camera feed" hidden></section>
+<div class="legend"><span class="allied">Allied</span><span class="adversary">Adversary</span><span class="uncertain">Uncertain</span></div>
+</section>
+<aside><div class="panel-heading"><h2>Scene overview</h2><span id="source-status">Ready</span></div><div class="counts"><div><strong id="count-allied">0</strong><span>Allied</span></div><div><strong id="count-adversary">0</strong><span>Adversary</span></div><div><strong id="count-uncertain">0</strong><span>Uncertain</span></div></div><div class="metrics"><span>FPS <b id="fps">—</b></span><span>Inference <b id="inference">—</b></span></div><h3>Detections</h3><ul id="detections"><li class="empty">Choose an input to begin.</li></ul></aside></div>
+</main><footer>Research prototype for decision support. Affiliation is inferred from aircraft type via a configurable table; outputs must be verified by a trained operator.</footer>
+</body></html>
