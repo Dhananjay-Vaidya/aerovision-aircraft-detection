@@ -658,9 +658,14 @@ def leakage_check(out_dir: Path, max_dist: int = 6, cache_path: Path = None, log
     return rows
 
 
-# ---- label-only geometry rules for the clean lists (no model predictions, no manual decisions) ----
-GT_OVERLAP_IOU = 0.5     # rule (i)
-SHARED_X_TOL = 0.002     # rule (ii), in normalised image width
+# ---- clean-list rules: label-only and model-independent (no model predictions, no manual decisions) ----
+# R1 leakage:        leakage_check() above (flip/rotation-invariant near copy of a train / val image).
+# R2 overlapping GT: some two GT boxes of the image have IoU >= GT_OVERLAP_IOU (0.5).
+# R3 stacked GT:     some two GT boxes share one x-range: |x0_a - x0_b| <= SHARED_X_TOL AND |x1_a - x1_b| <=
+#                    SHARED_X_TOL, with x in normalised image width (0.002 = 1.3 px at 640 px). y is not used.
+# audit_leakage.py calls write_clean_splits() below, so the audit and the build apply identical rules.
+GT_OVERLAP_IOU = 0.5     # R2
+SHARED_X_TOL = 0.002     # R3
 
 
 def gt_boxes_xyxy(out_dir: Path, split: str, file: str):
@@ -674,7 +679,7 @@ def gt_boxes_xyxy(out_dir: Path, split: str, file: str):
 
 
 def gt_overlap(boxes, thr: float = GT_OVERLAP_IOU) -> bool:
-    """Rule (i): some two GT boxes of the image have IoU >= thr."""
+    """R2: some two GT boxes of the image have IoU >= thr."""
     import numpy as np
     if len(boxes) < 2:
         return False
@@ -688,7 +693,7 @@ def gt_overlap(boxes, thr: float = GT_OVERLAP_IOU) -> bool:
 
 
 def shared_x_groups(boxes, tol: float = SHARED_X_TOL):
-    """Rule (ii), "stacked boxes on one x-range": groups (lists of box indices, size >= 2) of GT boxes whose left
+    """R3, "stacked GT boxes on one x-range": groups (lists of box indices, size >= 2) of GT boxes whose left
     edges x0 AND right edges x1 both agree within `tol` (normalised image width) with the first box of the group.
     Boxes are taken in label-file order; each box belongs to at most one group. This is the signature of an export
     defect in which several boxes of an image were given the horizontal extent of one aircraft (each keeping its
@@ -711,9 +716,9 @@ CLEAN_RULES = ("leak", "gt_overlap", "shared_x")
 def write_clean_splits(out_dir: Path, rows, stats=None, max_dist: int = 6):
     """Write <out>/val_clean.txt, <out>/test_clean.txt and <out>/data_clean.yaml (train as in data.yaml; val/test ->
     the lists). An image is left out of a clean list if
-      (leak)       it is flagged by the flip/rotation leakage check, or
-      (gt_overlap) two of its GT boxes overlap at IoU >= 0.5 (rule i), or
-      (shared_x)   two of its GT boxes share one x-range: |dx0| <= 0.002 and |dx1| <= 0.002 (rule ii).
+      R1 (leak)       it is flagged by the flip/rotation leakage check, or
+      R2 (gt_overlap) two of its GT boxes overlap at IoU >= 0.5, or
+      R3 (shared_x)   two of its GT boxes share one x-range: |dx0| <= 0.002 and |dx1| <= 0.002.
     Only the labels and the image hashes are used. Sets r["gt_overlap"], r["shared_x"], r["in_clean"] and
     r["removed_by"] (first rule that applies, in the order above) on every row; adds counts to `stats`."""
     out_dir = Path(out_dir).resolve()

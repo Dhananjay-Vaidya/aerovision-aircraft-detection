@@ -131,6 +131,20 @@ def merged_dataset(data_yaml: str | Path, out_dir: str | Path = MERGED_DIR, resu
     return out_yaml
 
 
+def check_aircraft_c_filter(corrupt_root: str | Path, test_stems: set[str], split_set: str) -> None:
+    """With the clean split set, Aircraft-C is restricted to the clean test images by file name. audit_leakage.py
+    writes that filter to <aircraft_c>/clean_test_files.txt; stop if it disagrees with test_clean.txt."""
+    if split_set != "clean":
+        return
+    f = Path(corrupt_root) / "clean_test_files.txt"
+    if not f.exists():
+        raise SystemExit(f"{f} missing: run python audit_leakage.py")
+    filt = {l.strip() for l in f.read_text(encoding="utf-8").splitlines() if l.strip()}
+    if filt != set(test_stems):
+        raise SystemExit(f"{f} ({len(filt)} files) differs from test_clean.txt ({len(test_stems)}): "
+                         "re-run python audit_leakage.py")
+
+
 def split_images(data_yaml: str | Path, split: str) -> list[Path]:
     """Images of a split from a data yaml whose entry is a folder or a .txt list."""
     data_yaml = Path(data_yaml)

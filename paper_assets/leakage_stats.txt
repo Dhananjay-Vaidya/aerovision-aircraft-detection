@@ -5,16 +5,22 @@ Hamming distance 6 of the same reference image. Flagged images are excluded from
 val_clean.txt / test_clean.txt; nothing is moved or deleted.
 Classes are after the merge rule (< 50 training images -> other_aircraft: Su-30MKI, Jaguar, J-16, J-11, KJ-500, Mirage-III-V, Saab-2000-Erieye).
 
-== Clean lists ==
+== Clean lists (R1-R3; label-only, model-independent) ==
 Labels are the original exported labels (no corrections applied). An image is in val_clean.txt /
-test_clean.txt unless (1) the leakage check flags it, (2) two of its GT boxes overlap at IoU >= 0.5,
-or (3) two of its GT boxes share one x-range (|dx0| <= 0.002 and |dx1| <= 0.002, normalised width;
-build_dataset.shared_x_groups). Only labels and image hashes are used; no model predictions and no
-manual decisions. Each column counts images removed by that rule and not by an earlier one.
-split   images  (1) leak  (2) IoU>=0.5  (3) shared x   clean
-val       2576       292            34            29    2221
-test      1286       188            14            13    1071
-Images meeting rule 2 / rule 3 regardless of the other rules: val 38 / 60; test 14 / 26
+test_clean.txt unless
+  R1 leakage:        the flip/rotation leakage check above flags it;
+  R2 overlapping GT: two of its GT boxes overlap at IoU >= 0.5;
+  R3 stacked GT:     two of its GT boxes share one x-range, |dx0| <= 0.002 and |dx1| <= 0.002
+                     (normalised image width; build_dataset.shared_x_groups).
+No model predictions and no manual decisions are used. 'removed' = by that rule and not an earlier one.
+split   images  R1 removed  R2 removed  R3 removed   clean
+val       2576         292          34          29    2221
+test      1286         188          14          13    1071
+
+Images meeting each rule regardless of the others, and overlaps between rules:
+split     R1    R2    R3   R1&R2   R1&R3   R2&R3   all 3   any
+val      292    38    60       4      12      23       4   355
+test     188    14    26       0       8       5       0   215
 
 == Flagged (leakage) ==
 val   flagged   292 / 2576  ( 11.3%)

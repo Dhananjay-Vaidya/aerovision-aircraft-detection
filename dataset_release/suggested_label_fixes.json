@@ -1,5 +1,5 @@
 {
- "status": "UNVERIFIED SUGGESTIONS - NOT APPLIED. The labels in this release are the original exported labels. These suggestions were not applied to them and are not used in the paper's evaluation.",
+ "status": "unverified, NOT applied in our evaluation; some coordinates derived from detector output",
  "purpose": "Errata for users of the source exports: val/test images whose exported boxes look wrong, with a suggested correction. Check each one yourself before using it.",
  "coordinates_note": "For action 'relocate', x0/x1 of the boxes were taken from the output of a trained yolo26s detector (conf >= 0.05, matched on vertical extent); only y0/y1 and the class are the original human annotation. These coordinates are detector output, not human annotation.",
  "actions": {

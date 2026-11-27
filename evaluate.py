@@ -27,8 +27,8 @@ from pathlib import Path
 
 import yaml
 
-from common import CORRUPTION_GROUP, ROOT, SPLIT_SETS, default_workers, list_images, load_affiliation, load_names, \
-    merged_dataset, split_images
+from common import CORRUPTION_GROUP, ROOT, SPLIT_SETS, check_aircraft_c_filter, default_workers, list_images, \
+    load_affiliation, load_names, merged_dataset, split_images
 
 GROUPS = ("seen", "held_out", "all")
 METRICS = ("map50", "map50_95", "precision", "recall")
@@ -92,6 +92,7 @@ def main(argv=None):
         raise SystemExit(f"No Aircraft-C folders under {croot}. Run corrupt.py first.")
     keep = {p.stem for p in list_images(conditions[0][2])}  # clean = the same images Aircraft-C contains
     clean = [p for p in split_images(data_yaml, "test") if p.stem in keep]
+    check_aircraft_c_filter(croot, {p.stem for p in clean}, args.split_set)
     print(f"[evaluate.py] split set {args.split_set}: {len(clean)} test images (Aircraft-C restricted to these)")
     if args.limit:
         clean = clean[: args.limit]

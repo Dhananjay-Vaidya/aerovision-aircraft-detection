@@ -10,8 +10,13 @@ labelled box +10%, decoded as in build_dataset.py). It is flagged when, for some
 image, BOTH distances are <= --dist (6). Train hashes come from raw/hash_cache.tsv.
 (An earlier "crop contained in whole image" criterion was dropped: on inspection it was mostly false positives.)
 
+Clean lists = R1 (this leakage check) + R2 (two GT boxes at IoU >= 0.5) + R3 (two GT boxes sharing one x-range),
+all label-only and model-independent; see build_dataset.write_clean_splits (shared with build_dataset.py).
+
 Writes
-  cvs_dataset/val_clean.txt, test_clean.txt   absolute image paths, flagged images left out (no file is moved)
+  cvs_dataset/val_clean.txt, test_clean.txt   absolute image paths, R1-R3 images left out (no file is moved)
+  data_derived/aircraft_c/clean_test_files.txt  Aircraft-C filename filter = the clean test images (no regeneration)
+  paper_assets/numbers.json                   every dataset count the paper cites
   cvs_dataset/data_clean.yaml                 train as data.yaml; val/test -> the lists
   cvs_dataset/build_report.json               + leakage_* counts
   results/leakage_audit.csv                   one row per val/test image
@@ -23,12 +28,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 from collections import Counter
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from build_dataset import LEAK_VARIANTS, leakage_check, update_build_report, write_clean_splits
+from build_dataset import GT_OVERLAP_IOU, LEAK_VARIANTS, SHARED_X_TOL, leakage_check, update_build_report, \
+    write_clean_splits
 from common import ROOT, class_merge_map, load_names
 
 FOCUS = ["HAL-Rudra", "HAL-Dhruv", "HAL-Chetak", "HAL-Prachand", "HAL-LUH", "C-130J", "An-32", "Tejas"]
@@ -53,9 +60,61 @@ def contact_sheet(pairs, data: Path, path: Path, th: int = 220, cols: int = 2):
     sheet.save(path, quality=90)
 
 
+RULES = {"R1": "flagged", "R2": "gt_overlap", "R3": "shared_x"}
+RULE_KEY = {"leak": "R1", "gt_overlap": "R2", "shared_x": "R3"}
+
+
+def paper_numbers(rows, counts, per, names, id_map, data: Path, dist: int) -> dict:
+    """Every dataset count the paper cites (paper_assets/numbers.json)."""
+    out = {"source": "audit_leakage.py on the original exported labels; clean-list rules R1-R3 "
+                     "(build_dataset.write_clean_splits)",
+           "rules": {"R1": f"flip/rotation-invariant near copy: for some variant of none/hflip/vflip/rot180, whole-image "
+                           f"AND largest-box-crop pHash within Hamming {dist} of one train image (val) or one "
+                           f"train/val image (test)",
+                     "R2": f"two GT boxes with IoU >= {GT_OVERLAP_IOU}",
+                     "R3": f"two GT boxes sharing one x-range: |dx0| <= {SHARED_X_TOL} and |dx1| <= {SHARED_X_TOL} "
+                           f"(normalised width)",
+                     "order": "removed counts attribute each image to the first rule it meets (R1, R2, R3)"},
+           "clean_lists": {}, "r1_by_transform": {}, "test_images": {}, "per_class_clean": {}}
+    for split in ("val", "test"):
+        sr = [r for r in rows if r["split"] == split]
+        hit = {k: {r["file"] for r in sr if r[f]} for k, f in RULES.items()}
+        out["clean_lists"][split] = {
+            "images": len(sr), "clean": counts[split][2],
+            "removed": {RULE_KEY[k]: sum(1 for r in sr if r["removed_by"] == k) for k in RULE_KEY},
+            "meets": {k: len(v) for k, v in hit.items()},
+            "overlap": {"R1&R2": len(hit["R1"] & hit["R2"]), "R1&R3": len(hit["R1"] & hit["R3"]),
+                        "R2&R3": len(hit["R2"] & hit["R3"]), "R1&R2&R3": len(hit["R1"] & hit["R2"] & hit["R3"]),
+                        "any": len(hit["R1"] | hit["R2"] | hit["R3"])},
+        }
+        out["r1_by_transform"][split] = {v: sum(1 for r in sr if r["flagged"] and r["variant"] == v)
+                                         for v in LEAK_VARIANTS}
+    out["r1_by_transform"]["total"] = {v: sum(out["r1_by_transform"][s][v] for s in ("val", "test"))
+                                       for v in LEAK_VARIANTS}
+    out["test_images"] = {"full": out["clean_lists"]["test"]["images"], "clean": out["clean_lists"]["test"]["clean"]}
+    out["val_images"] = {"full": out["clean_lists"]["val"]["images"], "clean": out["clean_lists"]["val"]["clean"]}
+    out["per_class_clean"] = {e["class"]: {"val_full": e["val_images"], "val_clean": e["val_clean"],
+                                           "test_full": e["test_images"], "test_clean": e["test_clean"]}
+                              for e in per.values() if e["val_images"] or e["test_images"]}
+    out["per_class_note"] = "images containing at least one box of the class, after the class merge"
+    return out
+
+
+def write_aircraft_c_filter(rows, corrupt_root: Path):
+    """Aircraft-C is restricted to the clean test images by file name (images are not regenerated). The filter is
+    written next to Aircraft-C; evaluate.py / abstain.py check it against test_clean.txt."""
+    if not corrupt_root.is_dir():
+        print(f"[audit] {corrupt_root} not found; Aircraft-C filter not written")
+        return
+    keep = sorted(Path(r["file"]).stem for r in rows if r["split"] == "test" and r["in_clean"])
+    (corrupt_root / "clean_test_files.txt").write_text("\n".join(keep) + "\n", encoding="utf-8")
+    print(f"[audit] wrote {corrupt_root / 'clean_test_files.txt'} ({len(keep)} test images)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", default=str(ROOT / "cvs_dataset"))
+    ap.add_argument("--corrupt-root", default=str(ROOT / "data_derived" / "aircraft_c"))
     ap.add_argument("--cache", default=str(ROOT / "raw" / "hash_cache.tsv"))
     ap.add_argument("--dist", type=int, default=6)
     ap.add_argument("--pairs", type=int, default=20)
@@ -118,21 +177,31 @@ def main(argv=None):
          f"Hamming distance {args.dist} of the same reference image. Flagged images are excluded from",
          f"val_clean.txt / test_clean.txt; nothing is moved or deleted.",
          f"Classes are after the merge rule (< 50 training images -> other_aircraft: {', '.join(merged)}).", ""]
-    L.append("== Clean lists ==")
+    nums = paper_numbers(rows, counts, per, names, id_map, data, args.dist)
+    (pa / "numbers.json").write_text(json.dumps(nums, indent=2), encoding="utf-8")
+    write_aircraft_c_filter(rows, Path(args.corrupt_root))
+
+    L.append("== Clean lists (R1-R3; label-only, model-independent) ==")
     L.append("Labels are the original exported labels (no corrections applied). An image is in val_clean.txt /")
-    L.append("test_clean.txt unless (1) the leakage check flags it, (2) two of its GT boxes overlap at IoU >= 0.5,")
-    L.append("or (3) two of its GT boxes share one x-range (|dx0| <= 0.002 and |dx1| <= 0.002, normalised width;")
-    L.append("build_dataset.shared_x_groups). Only labels and image hashes are used; no model predictions and no")
-    L.append("manual decisions. Each column counts images removed by that rule and not by an earlier one.")
-    L.append(f"{'split':<6}{'images':>8}{'(1) leak':>10}{'(2) IoU>=0.5':>14}{'(3) shared x':>14}{'clean':>8}")
+    L.append("test_clean.txt unless")
+    L.append(f"  R1 leakage:        the flip/rotation leakage check above flags it;")
+    L.append(f"  R2 overlapping GT: two of its GT boxes overlap at IoU >= {GT_OVERLAP_IOU};")
+    L.append(f"  R3 stacked GT:     two of its GT boxes share one x-range, |dx0| <= {SHARED_X_TOL} and |dx1| <= "
+             f"{SHARED_X_TOL}")
+    L.append("                     (normalised image width; build_dataset.shared_x_groups).")
+    L.append("No model predictions and no manual decisions are used. 'removed' = by that rule and not an earlier one.")
+    L.append(f"{'split':<6}{'images':>8}{'R1 removed':>12}{'R2 removed':>12}{'R3 removed':>12}{'clean':>8}")
     for split in ("val", "test"):
-        n, fl, kept = counts[split]
-        sr = [r for r in rows if r["split"] == split]
-        k = {rule: sum(1 for r in sr if r["removed_by"] == rule) for rule in ("leak", "gt_overlap", "shared_x")}
-        L.append(f"{split:<6}{n:>8}{k['leak']:>10}{k['gt_overlap']:>14}{k['shared_x']:>14}{kept:>8}")
-    L.append("Images meeting rule 2 / rule 3 regardless of the other rules: " + "; ".join(
-        f"{s} {sum(r['gt_overlap'] for r in rows if r['split'] == s)} / "
-        f"{sum(r['shared_x'] for r in rows if r['split'] == s)}" for s in ("val", "test")))
+        e = nums["clean_lists"][split]
+        L.append(f"{split:<6}{e['images']:>8}{e['removed']['R1']:>12}{e['removed']['R2']:>12}"
+                 f"{e['removed']['R3']:>12}{e['clean']:>8}")
+    L.append("")
+    L.append("Images meeting each rule regardless of the others, and overlaps between rules:")
+    L.append(f"{'split':<6}{'R1':>6}{'R2':>6}{'R3':>6}{'R1&R2':>8}{'R1&R3':>8}{'R2&R3':>8}{'all 3':>8}{'any':>6}")
+    for split in ("val", "test"):
+        m, o = nums["clean_lists"][split]["meets"], nums["clean_lists"][split]["overlap"]
+        L.append(f"{split:<6}{m['R1']:>6}{m['R2']:>6}{m['R3']:>6}{o['R1&R2']:>8}{o['R1&R3']:>8}{o['R2&R3']:>8}"
+                 f"{o['R1&R2&R3']:>8}{o['any']:>6}")
     L.append("")
     L.append("== Flagged (leakage) ==")
     for split in ("val", "test"):

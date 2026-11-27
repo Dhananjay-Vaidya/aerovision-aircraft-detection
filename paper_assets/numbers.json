@@ -1,0 +1,258 @@
+{
+  "source": "audit_leakage.py on the original exported labels; clean-list rules R1-R3 (build_dataset.write_clean_splits)",
+  "rules": {
+    "R1": "flip/rotation-invariant near copy: for some variant of none/hflip/vflip/rot180, whole-image AND largest-box-crop pHash within Hamming 6 of one train image (val) or one train/val image (test)",
+    "R2": "two GT boxes with IoU >= 0.5",
+    "R3": "two GT boxes sharing one x-range: |dx0| <= 0.002 and |dx1| <= 0.002 (normalised width)",
+    "order": "removed counts attribute each image to the first rule it meets (R1, R2, R3)"
+  },
+  "clean_lists": {
+    "val": {
+      "images": 2576,
+      "clean": 2221,
+      "removed": {
+        "R1": 292,
+        "R2": 34,
+        "R3": 29
+      },
+      "meets": {
+        "R1": 292,
+        "R2": 38,
+        "R3": 60
+      },
+      "overlap": {
+        "R1&R2": 4,
+        "R1&R3": 12,
+        "R2&R3": 23,
+        "R1&R2&R3": 4,
+        "any": 355
+      }
+    },
+    "test": {
+      "images": 1286,
+      "clean": 1071,
+      "removed": {
+        "R1": 188,
+        "R2": 14,
+        "R3": 13
+      },
+      "meets": {
+        "R1": 188,
+        "R2": 14,
+        "R3": 26
+      },
+      "overlap": {
+        "R1&R2": 0,
+        "R1&R3": 8,
+        "R2&R3": 5,
+        "R1&R2&R3": 0,
+        "any": 215
+      }
+    }
+  },
+  "r1_by_transform": {
+    "val": {
+      "none": 93,
+      "hflip": 137,
+      "vflip": 32,
+      "rot180": 30
+    },
+    "test": {
+      "none": 57,
+      "hflip": 89,
+      "vflip": 25,
+      "rot180": 17
+    },
+    "total": {
+      "none": 150,
+      "hflip": 226,
+      "vflip": 57,
+      "rot180": 47
+    }
+  },
+  "test_images": {
+    "full": 1286,
+    "clean": 1071
+  },
+  "per_class_clean": {
+    "AH-64": {
+      "val_full": 111,
+      "val_clean": 105,
+      "test_full": 56,
+      "test_clean": 52
+    },
+    "An-32": {
+      "val_full": 35,
+      "val_clean": 29,
+      "test_full": 18,
+      "test_clean": 15
+    },
+    "C-130J": {
+      "val_full": 42,
+      "val_clean": 37,
+      "test_full": 21,
+      "test_clean": 16
+    },
+    "C-17": {
+      "val_full": 176,
+      "val_clean": 155,
+      "test_full": 85,
+      "test_clean": 72
+    },
+    "C-295": {
+      "val_full": 58,
+      "val_clean": 55,
+      "test_full": 29,
+      "test_clean": 27
+    },
+    "CH-47": {
+      "val_full": 142,
+      "val_clean": 134,
+      "test_full": 74,
+      "test_clean": 67
+    },
+    "F-16": {
+      "val_full": 202,
+      "val_clean": 182,
+      "test_full": 102,
+      "test_clean": 94
+    },
+    "H-6": {
+      "val_full": 59,
+      "val_clean": 50,
+      "test_full": 29,
+      "test_clean": 21
+    },
+    "HAL-Chetak": {
+      "val_full": 54,
+      "val_clean": 41,
+      "test_full": 27,
+      "test_clean": 17
+    },
+    "HAL-Dhruv": {
+      "val_full": 60,
+      "val_clean": 38,
+      "test_full": 30,
+      "test_clean": 15
+    },
+    "HAL-LUH": {
+      "val_full": 88,
+      "val_clean": 83,
+      "test_full": 44,
+      "test_clean": 41
+    },
+    "HAL-Prachand": {
+      "val_full": 62,
+      "val_clean": 60,
+      "test_full": 31,
+      "test_clean": 30
+    },
+    "HAL-Rudra": {
+      "val_full": 56,
+      "val_clean": 45,
+      "test_full": 28,
+      "test_clean": 20
+    },
+    "Il-76-78": {
+      "val_full": 93,
+      "val_clean": 70,
+      "test_full": 47,
+      "test_clean": 37
+    },
+    "J-10": {
+      "val_full": 69,
+      "val_clean": 64,
+      "test_full": 34,
+      "test_clean": 30
+    },
+    "J-20": {
+      "val_full": 98,
+      "val_clean": 95,
+      "test_full": 50,
+      "test_clean": 43
+    },
+    "JF-17": {
+      "val_full": 49,
+      "val_clean": 33,
+      "test_full": 25,
+      "test_clean": 19
+    },
+    "JH-7": {
+      "val_full": 45,
+      "val_clean": 37,
+      "test_full": 22,
+      "test_clean": 17
+    },
+    "Mi-24-35": {
+      "val_full": 93,
+      "val_clean": 69,
+      "test_full": 45,
+      "test_clean": 35
+    },
+    "Mi-26": {
+      "val_full": 74,
+      "val_clean": 38,
+      "test_full": 37,
+      "test_clean": 14
+    },
+    "Mi-8-17": {
+      "val_full": 150,
+      "val_clean": 123,
+      "test_full": 74,
+      "test_clean": 62
+    },
+    "MiG-29": {
+      "val_full": 59,
+      "val_clean": 51,
+      "test_full": 29,
+      "test_clean": 23
+    },
+    "Mirage-2000": {
+      "val_full": 67,
+      "val_clean": 54,
+      "test_full": 33,
+      "test_clean": 27
+    },
+    "Rafale": {
+      "val_full": 93,
+      "val_clean": 90,
+      "test_full": 46,
+      "test_clean": 43
+    },
+    "Tejas": {
+      "val_full": 34,
+      "val_clean": 21,
+      "test_full": 17,
+      "test_clean": 13
+    },
+    "WZ-7": {
+      "val_full": 33,
+      "val_clean": 15,
+      "test_full": 17,
+      "test_clean": 13
+    },
+    "Y-20": {
+      "val_full": 57,
+      "val_clean": 43,
+      "test_full": 28,
+      "test_clean": 18
+    },
+    "Z-10": {
+      "val_full": 29,
+      "val_clean": 14,
+      "test_full": 14,
+      "test_clean": 3
+    },
+    "other_aircraft": {
+      "val_full": 613,
+      "val_clean": 573,
+      "test_full": 321,
+      "test_clean": 295
+    }
+  },
+  "val_images": {
+    "full": 2576,
+    "clean": 2221
+  },
+  "per_class_note": "images containing at least one box of the class, after the class merge"
+}
